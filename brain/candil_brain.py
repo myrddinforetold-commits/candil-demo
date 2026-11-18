@@ -127,7 +127,7 @@ def start_relay(api_key):
             req.pop('reasoning_effort', None)
             req['reasoning'] = {'effort': 'low', 'exclude': True}
             req['provider'] = {'data_collection': 'deny', 'ignore': ['DeepSeek']}   # hosts that keep no data; not DeepSeek's own servers
-            hdr = {'Authorization': f'Bearer {api_key}', 'HTTP-Referer': 'https://candil.demo', 'X-Title': 'Candil demo'}
+            hdr = {'Authorization': f'Bearer {api_key}', 'HTTP-Referer': 'https://candil-demo.vercel.app', 'X-Title': 'Candil demo', 'Accept-Encoding': 'identity'}
             with httpx.Client(timeout=httpx.Timeout(180, connect=20)) as c:
                 for attempt in (1, 2):
                     with c.stream('POST', 'https://openrouter.ai/api/v1/chat/completions', json=req, headers=hdr) as r:
@@ -136,7 +136,7 @@ def start_relay(api_key):
                         self.send_response(r.status_code)
                         self.send_header('Content-Type', r.headers.get('content-type', 'text/event-stream'))
                         self.end_headers()
-                        for chunk in r.iter_raw():
+                        for chunk in r.iter_bytes():   # decoded: lastbook reads plain SSE lines
                             self.wfile.write(chunk); self.wfile.flush()
                         return
 
