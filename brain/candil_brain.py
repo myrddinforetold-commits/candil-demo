@@ -54,15 +54,24 @@ def setup_library(pack: str = 'small'):
     """Download lastbook's library pack from downloads.lastbook.org, check every SHA-256, unpack into the volume."""
     import hashlib, json, os, shutil, urllib.request, zipfile
     from pathlib import Path
-    m = json.load(urllib.request.urlopen('https://downloads.lastbook.org/manifest-v1.json', timeout=60))
+    # an honest client name: the download site turns away Python's default one (the user approved fetching the public pack)
+    UA = {'User-Agent': 'CandilDemo/0.1 (lastbook setup; Small pack)', 'Accept-Encoding': 'identity'}
+    get = lambda url, t: urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=t)
+    try:
+        m = json.load(get('https://downloads.lastbook.org/manifest-v1.json', 60))
+    except Exception as e:
+        raise RuntimeError(f'manifest: {e}') from None
     p = next(x for x in m['packs'] if x['id'] == pack)
     work = Path(DATA) / 'work'; work.mkdir(parents=True, exist_ok=True)
     for f in p['files']:
         dst = work / f['name']
         if not (dst.exists() and dst.stat().st_size == f['size']):
             print('downloading', f['name'], round(f['size'] / 1e9, 2), 'GB', flush=True)
-            with urllib.request.urlopen(f['url'], timeout=120) as r, open(dst, 'wb') as out:
-                shutil.copyfileobj(r, out, 1 << 22)
+            try:
+                with get(f['url'], 120) as r, open(dst, 'wb') as out:
+                    shutil.copyfileobj(r, out, 1 << 22)
+            except Exception as e:
+                raise RuntimeError(f'{f["name"]}: {e}') from None
         h = hashlib.sha256()
         with open(dst, 'rb') as fh:
             for b in iter(lambda: fh.read(1 << 22), b''):
