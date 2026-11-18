@@ -43,7 +43,7 @@ image = (
     .pip_install('kokoro>=0.9', 'misaki[en]')
     .run_commands(f'git clone https://github.com/Immortal-Protocols/lastbook /app/lastbook && cd /app/lastbook && git checkout {LASTBOOK_COMMIT}')
     .env({'HF_HOME': '/models/hf', 'LASTBOOK_DATA': LIB, 'SURVIVAL_PDF_ENGINE': 'pdfium', 'SURVIVAL_DISABLE_INDEX_WATCH': '1',
-          'SURVIVAL_MODEL_BASE': 'http://127.0.0.1:19443', 'SURVIVAL_MODEL': 'quick', 'SURVIVAL_REASONING_EFFORT': 'low'})
+          'SURVIVAL_MODEL_BASE': 'http://127.0.0.1:19443', 'SURVIVAL_MODEL': 'quick', 'SURVIVAL_REASONING_EFFORT': 'none'})
     .run_function(_bake_models)
 )
 
@@ -125,7 +125,11 @@ def start_relay(api_key):
             tier = req.get('model') if req.get('model') in MODELS else 'quick'
             req['model'] = MODELS[tier]
             req.pop('reasoning_effort', None)
-            req['reasoning'] = {'effort': 'low', 'exclude': True}
+            if tier == 'quick':   # Gemma spends a whole round thinking at 'low'; lastbook's own note says 'none' answers straight away
+                req['reasoning'] = {'effort': 'none', 'exclude': True}
+            else:                 # DeepSeek thinks a little; its thinking counts against the token budget
+                req['reasoning'] = {'effort': 'low', 'exclude': True}
+                req['max_tokens'] = max(int(req.get('max_tokens') or 0), 4000)
             req['provider'] = {'data_collection': 'deny', 'ignore': ['DeepSeek']}   # hosts that keep no data; not DeepSeek's own servers
             hdr = {'Authorization': f'Bearer {api_key}', 'HTTP-Referer': 'https://candil-demo.vercel.app', 'X-Title': 'Candil demo', 'Accept-Encoding': 'identity'}
             with httpx.Client(timeout=httpx.Timeout(180, connect=20)) as c:
