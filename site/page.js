@@ -58,7 +58,7 @@ export class PageScreen {
     g.font = `400 52px ${SANS}`; g.fillStyle = MUTED;
     g.fillText('Hold the ring while you talk. Let go, and Candil answers', M, 760);
     g.fillText('out loud and shows the steps here.', M, 830);
-    this.foot('Every answer comes from the library on this device and names its source.', 'Ready');
+    this.foot('Every answer comes from this device and names its source.', 'Ready');
   }
 
   listening(status, heard) {
