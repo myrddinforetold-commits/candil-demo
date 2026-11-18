@@ -25,10 +25,13 @@ vol = modal.Volume.from_name('candil-library', create_if_missing=True)
 def _bake_models():
     from faster_whisper import WhisperModel
     WhisperModel(WHISPER, device='cpu', compute_type='int8', download_root='/models/whisper')
-    from kokoro import KPipeline
-    p = KPipeline(lang_code='b')
-    for _ in p('Ready.', voice=VOICE):
-        pass
+    try:   # the voice is optional: if it fails to build, answers still come back as text
+        from kokoro import KPipeline
+        p = KPipeline(lang_code='b')
+        for _ in p('Ready.', voice=VOICE):
+            pass
+    except Exception as e:
+        print('voice not baked:', e)
 
 
 image = (
