@@ -165,9 +165,13 @@ def to_page(md, sources):
                 continue
         if not skip:
             body.append(l)
-    steps = [clean(re.sub(r'^\d+[.)]\s*', '', l)) for l in body if re.match(r'^\d+[.)]\s+', l)]
-    if not steps:
-        steps = [clean(l[2:]) for l in body if l.startswith(('- ', '* '))]
+    raw = [re.sub(r'^\d+[.)]\s*', '', l) for l in body if re.match(r'^\d+[.)]\s+', l)]
+    if not raw:
+        raw = [l[2:] for l in body if l.startswith(('- ', '* '))]
+    # The page shows only steps the library backs: a step with no source key is the model's own aside.
+    if any(re.search(r'\[S\d+\]', r) for r in raw):
+        raw = [r for r in raw if re.search(r'\[S\d+\]', r)]
+    steps = [clean(re.sub(r'\[(?:Note|Source)[^\]]*\]', '', r)) for r in raw]
     steps = [re.sub(r'^[^:]{2,40}:\s*', '', st) if ':' in st[:42] else st for st in steps]
     head = next((clean(l) for l in lines if l and not l.startswith(('#', '-', '*', '|')) and not re.match(r'^\d+[.)]', l)), '')
     head = re.split(r'(?<=[.!?])\s', head, 1)[0] if head else (steps[0] if steps else '')
@@ -183,7 +187,13 @@ def to_page(md, sources):
                 break
             if l and not l.startswith(('*', '-')) and warning == '' and l.lower().startswith(('not found', 'my own')):
                 break
-    src = sources[0] if sources else {}
+    src = dict(sources[0]) if sources else {}
+    t = src.get('title') or ''
+    if t.startswith('http'):                               # some saved pages are titled by their address
+        host = re.sub(r'^www\.', '', t.split('/')[2]) if t.count('/') >= 2 else ''
+        slug = re.sub(r'^(fema|ready)[_-]', '', t.rstrip('/').rsplit('/', 1)[-1].rsplit('.', 1)[0])
+        src['title'] = slug.replace('-', ' ').replace('_', ' ').strip().capitalize()
+        src['publisher'] = {'ready.gov': 'Ready.gov', 'fema.gov': 'FEMA'}.get(host, src.get('publisher') or host)
     name = src.get('title') or src.get('publisher') or 'the Candil library'
     if src.get('publisher') and src.get('title') and src['publisher'] not in src['title']:
         name = f"{src['publisher']}: {src['title']}"
