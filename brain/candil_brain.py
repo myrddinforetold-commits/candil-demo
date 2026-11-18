@@ -277,15 +277,24 @@ class Brain:
                       voice: int = Form(1)):
             t0 = time.time(); heard_s = None
             if audio is not None:
-                with tempfile.NamedTemporaryFile(suffix='.' + (audio.filename or 'q.mp3').rsplit('.', 1)[-1]) as f:
-                    f.write(await audio.read()); f.flush()
-                    question = self.hear(f.name)
+                try:
+                    data = await audio.read()
+                    with tempfile.NamedTemporaryFile(suffix='.' + (audio.filename or 'q.mp3').rsplit('.', 1)[-1]) as f:
+                        f.write(data); f.flush()
+                        question = self.hear(f.name)
+                except Exception as e:
+                    import traceback; traceback.print_exc()
+                    return {'error': f'Candil could not hear that ({type(e).__name__}: {e})'[:300]}
                 heard_s = round(time.time() - t0, 2)
             question = (question or '').strip()[:600]
             if not question:
                 return {'error': 'I did not hear a question.'}
             tier = tier if tier in MODELS else 'quick'
-            out = self.answer(question, tier)
+            try:
+                out = self.answer(question, tier)
+            except Exception as e:
+                import traceback; traceback.print_exc()
+                return {'question': question, 'error': f'The answer failed ({type(e).__name__}: {e})'[:300]}
             if 'error' in out:
                 return {'question': question, **out}
             p = out['page']
