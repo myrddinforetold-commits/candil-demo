@@ -35,6 +35,18 @@ jobs:
       - name: Deploy
         if: github.event_name == 'push' || inputs.task == 'deploy'
         run: modal deploy brain/candil_brain.py
+      - name: Retire containers still running the previous version
+        if: github.event_name == 'push' || inputs.task == 'deploy'
+        run: |
+          modal container list --json > containers.json || echo '[]' > containers.json
+          python3 - <<'PY'
+          import json, subprocess
+          for c in json.load(open('containers.json')):
+              if c.get('App Name') == 'candil-brain' or 'candil-brain' in json.dumps(c):
+                  cid = c.get('Container ID') or c.get('container_id')
+                  print('stopping', cid)
+                  subprocess.run(['modal', 'container', 'stop', cid])
+          PY
       - name: Ask one question
         if: github.event_name == 'workflow_dispatch' && inputs.task == 'ask'
         env:
