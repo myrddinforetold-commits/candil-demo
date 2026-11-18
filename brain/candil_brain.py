@@ -149,6 +149,19 @@ def start_relay(api_key):
 
 
 # ------------------------------------------------------------------ answer -> page
+def nice_source(src):
+    """Some saved web pages are titled by their address; give them a readable title and publisher."""
+    import re
+    src = dict(src)
+    t = src.get('title') or ''
+    if t.startswith('http'):
+        host = re.sub(r'^www\.', '', t.split('/')[2]) if t.count('/') >= 2 else ''
+        slug = re.sub(r'^(fema|ready)[_-]', '', t.rstrip('/').rsplit('/', 1)[-1].rsplit('.', 1)[0])
+        src['title'] = slug.replace('-', ' ').replace('_', ' ').strip().capitalize()
+        src['publisher'] = {'ready.gov': 'Ready.gov', 'fema.gov': 'FEMA'}.get(host, src.get('publisher') or host)
+    return src
+
+
 def to_page(md, sources):
     """Lastbook's cited markdown answer, shaped for Candil's e-paper page and its voice."""
     import re
@@ -187,13 +200,7 @@ def to_page(md, sources):
                 break
             if l and not l.startswith(('*', '-')) and warning == '' and l.lower().startswith(('not found', 'my own')):
                 break
-    src = dict(sources[0]) if sources else {}
-    t = src.get('title') or ''
-    if t.startswith('http'):                               # some saved pages are titled by their address
-        host = re.sub(r'^www\.', '', t.split('/')[2]) if t.count('/') >= 2 else ''
-        slug = re.sub(r'^(fema|ready)[_-]', '', t.rstrip('/').rsplit('/', 1)[-1].rsplit('.', 1)[0])
-        src['title'] = slug.replace('-', ' ').replace('_', ' ').strip().capitalize()
-        src['publisher'] = {'ready.gov': 'Ready.gov', 'fema.gov': 'FEMA'}.get(host, src.get('publisher') or host)
+    src = nice_source(sources[0]) if sources else {}
     name = src.get('title') or src.get('publisher') or 'the Candil library'
     if src.get('publisher') and src.get('title') and src['publisher'] not in src['title']:
         name = f"{src['publisher']}: {src['title']}"
@@ -261,7 +268,7 @@ class Brain:
             err = next((e for e in events if e.get('type') == 'error'), {})
             return {'error': err.get('text') or 'No answer came back.'}
         page = to_page(done['answer'], done['sources'])
-        return {'answer_md': done['answer'], 'sources': done['sources'], 'page': page, 'latency': done.get('latency'),
+        return {'answer_md': done['answer'], 'sources': [nice_source(x) for x in done['sources']], 'page': page, 'latency': done.get('latency'),
                 'tools': done.get('tools')}
 
     @modal.method()
@@ -283,20 +290,6 @@ class Brain:
         def health():
             st = self.assistant.model_status()
             return {'ok': st['online'], 'model': st['model'], 'library': LIB}
-
-        @api.get('/debug/model')
-        def debug_model(tier: str = 'quick', stream: int = 1):
-            # temporary: what the relay sends back for a tiny question, as lastbook would see it
-            import json, urllib.request
-            body = {'model': tier, 'messages': [{'role': 'user', 'content': 'Say hello in five words.'}], 'stream': bool(stream),
-                    'max_tokens': 300, 'reasoning_effort': 'low'}
-            req = urllib.request.Request('http://127.0.0.1:19443/v1/chat/completions', json.dumps(body).encode(), {'Content-Type': 'application/json'})
-            try:
-                with urllib.request.urlopen(req, timeout=120) as r:
-                    raw = r.read().decode('utf-8', 'replace')
-                return {'status': 200, 'raw': raw[:6000]}
-            except Exception as e:
-                return {'error': repr(e), 'body': getattr(e, 'read', lambda: b'')().decode('utf-8', 'replace')[:3000]}
 
         @api.post('/speak')
         def speak(text: str = Form(...)):
