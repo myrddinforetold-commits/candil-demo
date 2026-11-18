@@ -59,6 +59,35 @@ function drawPage(v = view) { view = v; page.draw({ ...v, status: status() }); s
 const wait = ms => new Promise(r => setTimeout(r, ms));
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+// ---------------------------------------------------------------- sound: the button's click and the power dying
+const sfx = (() => {
+  let ctx = null;
+  const ac = () => { if (!ctx) { try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; } } if (ctx.state === 'suspended') ctx.resume(); return ctx; };
+  const noise = (c, ms) => { const b = c.createBuffer(1, Math.ceil(c.sampleRate * ms / 1000), c.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length) ** 3; return b; };
+  return {
+    unlock: ac,
+    click(level = 1) {           // a short, damped tactile click
+      const c = ac(); if (!c) return; const t = c.currentTime;
+      const src = c.createBufferSource(); src.buffer = noise(c, 18);
+      const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 3200; bp.Q.value = 1.2;
+      const g = c.createGain(); g.gain.value = 0.55 * level;
+      src.connect(bp).connect(g).connect(c.destination); src.start(t);
+      const o = c.createOscillator(), og = c.createGain(); o.frequency.setValueAtTime(190, t); o.frequency.exponentialRampToValueAtTime(90, t + 0.05);
+      og.gain.setValueAtTime(0.18 * level, t); og.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+      o.connect(og).connect(c.destination); o.start(t); o.stop(t + 0.08);
+    },
+    thunk() {                    // the room's power dying: a low thud and the hum stopping
+      const c = ac(); if (!c) return; const t = c.currentTime;
+      const o = c.createOscillator(), g = c.createGain(); o.type = 'sine';
+      o.frequency.setValueAtTime(95, t); o.frequency.exponentialRampToValueAtTime(38, t + 0.35);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.32, t + 0.012); g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+      o.connect(g).connect(c.destination); o.start(t); o.stop(t + 0.55);
+      const src = c.createBufferSource(); src.buffer = noise(c, 60); const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900;
+      const ng = c.createGain(); ng.gain.value = 0.25; src.connect(lp).connect(ng).connect(c.destination); src.start(t);
+    },
+  };
+})();
+
 let toastTimer = 0;
 function toast(text, ms = 3600) {
   const t = $('toast'); t.textContent = text; t.classList.add('on');
@@ -76,14 +105,24 @@ function setNet(on) {
   if (!on) toast('The internet is down. Candil never needed it: its library and its AI are inside the case.');
 }
 
-function setPower(on) {
+let powerSeq = 0;
+async function setPower(on) {
+  // the room's lights flicker and cut to black; when they come back they stutter on
+  const my = ++powerSeq;
   world.power = on; $('b-power').setAttribute('aria-pressed', String(!on));
   setChip('chip-power', on, 'Power');
-  document.body.classList.toggle('dark', !on);
-  stage.setPower(on); stage.setFrontLight(on ? 0 : 1);
-  $('hud').classList.toggle('on', !on);
-  if (!on) toast('The power is out. The ring glows in the dark and the screen has its own warm light.');
+  const room = lv => { document.body.classList.toggle('dark', lv < 0.5); stage.setLight(lv); };
+  document.body.classList.add('cut');
+  const seq = on ? [[1, 60], [0, 90], [1, 0]] : [[0.35, 70], [1, 60], [0, 45], [0.7, 80], [0, 0]];
+  if (!on) { stage.setFrontLight(0); $('hud').classList.remove('on'); }
+  for (const [lv, ms] of seq) { if (my !== powerSeq) return; room(lv); if (!on && lv === 0 && ms === 0) sfx.thunk(); if (ms) await wait(ms); }
+  document.body.classList.remove('cut');
   drawPage();
+  if (on) { stage.setFrontLight(0); updateFrame(); return; }
+  await wait(650); if (my !== powerSeq) return;
+  stage.setFrontLight(1);                        // Candil notices the dark and lights its own page
+  $('hud').classList.add('on'); updateFrame();
+  toast('The power is out. The ring glows in the dark and the screen has its own warm light.');
 }
 
 function setLid(open) {
@@ -98,8 +137,27 @@ function setInside(on) {
   stage.setExplode(on ? 1 : 0); stage.view(on ? 'inside' : 'hero');
 }
 
-function showPanel(html) { $('panel-body').innerHTML = html; $('panel').classList.add('on'); }
-$('panel-x').addEventListener('click', () => $('panel').classList.remove('on'));
+function showPanel(html) { $('panel-body').innerHTML = html; $('panel').classList.add('on'); $('panel').scrollTop = 0; updateFrame(); }
+function hidePanel() { $('panel').classList.remove('on'); updateFrame(); }
+$('panel-x').addEventListener('click', hidePanel);
+
+// keep the device framed in the part of the screen the header, controls and answer panel leave clear
+function updateFrame() {
+  if (!stage) return;
+  const W = innerWidth, H = innerHeight, phone = W <= 700;
+  const dock = $('dock').getBoundingClientRect();
+  document.documentElement.style.setProperty('--dock-h', Math.round(dock.height) + 'px');
+  const hud = $('hud').classList.contains('on') ? $('hud').getBoundingClientRect().bottom : 0;
+  const top = Math.max(document.querySelector('header').getBoundingClientRect().bottom, hud) + 4;
+  let bottom = H - dock.top + 6, right = 0;
+  const panel = $('panel');
+  if (panel.classList.contains('on')) {
+    if (phone) bottom = Math.max(bottom, H - (H - (dock.height + 8 + 16) - panel.offsetHeight) + 6);
+    else right = panel.offsetWidth + 30;
+  }
+  stage.setFrame({ t: top, r: right, b: bottom, l: 0 });
+}
+addEventListener('resize', () => updateFrame());
 
 // ---------------------------------------------------------------- asking
 function primeAudio(src) {
@@ -174,29 +232,29 @@ function showAnswer(a) {
     <ol>${a.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol>
     ${a.warning ? `<div class="hl" style="font-size:17px">⚠ ${esc(a.warning)}</div>` : ''}
     ${src ? `<h3>Sources in the library</h3><ol class="src">${src}</ol>` : `<div class="src">Source: ${esc(a.source)}</div>`}
-    <div class="meta">${a.live ? `Real Candil software · ${esc(a.model || '')}<br>Heard in ${a.timing?.heard_s ?? '–'} s · answered in ${a.timing?.answer_s ?? '–'} s` : 'Live software: not reached'}<br>Internet: ${world.net ? 'on' : 'out'} · Power: ${world.power ? 'on' : 'out'}</div>`);
+    <div class="meta">${a.live ? `Real Candil software, running in the cloud for this demo · ${esc(a.model || '')}<br>Heard in ${a.timing?.heard_s ?? '–'} s · answered in ${a.timing?.answer_s ?? '–'} s` : 'Live software: not reached'}<br>Internet: ${world.net ? 'on' : 'out'} · Power: ${world.power ? 'on' : 'out'}</div>`);
 }
 
 async function ask(id) {
   if (busy || !stage) return;
   busy = true; document.querySelectorAll('button.ask').forEach(b => b.disabled = true);
   const sc = SCENARIOS[id];
-  const primed = primeAudio(sc.audio);
+  const primed = primeAudio(sc.audio); sfx.unlock();
   try {
     if (sc.world === 'net' && world.net) { setNet(false); await wait(1800); }
     if (sc.world === 'power' && world.power) { setPower(false); await wait(2200); }
     if (world.inside) { setInside(false); await wait(900); }
     if (!world.lid) { setLid(true); await wait(1300); }
-    $('panel').classList.remove('on');
+    hidePanel();
     stage.view('ask', 1.3); await wait(1300);
     drawPage({ mode: 'ready' });
-    await stage.press();
+    await stage.press(); sfx.click();
     stage.setRing('listening');
     drawPage({ mode: 'listening', heard: '' });
     await listen(sc, heard => {
       if (heard !== view.heard) drawPage({ mode: 'listening', heard });
     }, primed);
-    await stage.release();
+    sfx.click(0.45); await stage.release();
     stage.setRing('thinking');
     drawPage({ mode: 'thinking', question: sc.question });
     const a = await getAnswer(sc);
@@ -233,12 +291,13 @@ async function start() {
     ],
   });
   $('loading').remove();
+  updateFrame();
   // first impression: closed, then the lid drops open
   stage.setClosedNow(); world.lid = false; setLid(false);
   setTimeout(() => setLid(true), 1100);
 
   $('b-net').addEventListener('click', () => setNet(!world.net));
-  $('b-power').addEventListener('click', () => setPower(!world.power));
+  $('b-power').addEventListener('click', () => { sfx.unlock(); setPower(!world.power); });
   $('b-lid').addEventListener('click', () => setLid(!world.lid));
   $('b-inside').addEventListener('click', () => setInside(!world.inside));
   document.querySelectorAll('button.ask').forEach(b => b.addEventListener('click', () => ask(b.dataset.scenario)));
@@ -249,27 +308,32 @@ function setupMic() {
   const btn = $('b-mic');
   if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) { btn.title = 'This browser cannot record'; return; }
   btn.disabled = false; btn.title = 'Hold to talk, let go to ask';
-  btn.innerHTML = '<span class="dot"></span>Hold to ask your own';
-  let rec = null, chunks = [], stream = null, t0 = 0;
+  btn.innerHTML = '<span class="dot"></span><span class="long">Hold to ask your own</span><span class="short">Hold to ask</span>';
+  let rec = null, chunks = [], stream = null, t0 = 0, held = false;
   const start = async e => {
-    e.preventDefault();
+    e.preventDefault(); held = true;
     if (busy || rec) return;
-    busy = true;
+    busy = true; sfx.unlock();
     try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
     catch { busy = false; toast('Microphone access was not allowed.'); return; }
+    if (!held) {                       // the permission prompt took the press: start on the next one
+      stream.getTracks().forEach(t => t.stop()); busy = false;
+      toast('Microphone ready. Hold the button while you talk.'); return;
+    }
     if (!world.lid) { setLid(true); }
-    $('panel').classList.remove('on');
-    stage.view('ask', 0.9); stage.press(); stage.setRing('listening');
+    hidePanel();
+    stage.view('ask', 0.9); stage.press().then(() => sfx.click()); stage.setRing('listening');
     drawPage({ mode: 'listening', heard: '' });
     chunks = []; rec = new MediaRecorder(stream); rec.ondataavailable = ev => ev.data.size && chunks.push(ev.data); rec.start(); t0 = performance.now();
     btn.setAttribute('aria-pressed', 'true');
   };
   const stop = async () => {
+    held = false;
     if (!rec) return;
     const r = rec; rec = null; btn.setAttribute('aria-pressed', 'false');
     await new Promise(res => { r.onstop = res; r.stop(); });
     stream.getTracks().forEach(t => t.stop());
-    await stage.release();
+    sfx.click(0.45); await stage.release();
     if (performance.now() - t0 < 700) { stage.setRing('ready'); drawPage({ mode: 'ready' }); busy = false; toast('Hold the button while you talk.'); return; }
     stage.setRing('thinking'); drawPage({ mode: 'thinking', question: '…' });
     const a = await getAnswer(null, new Blob(chunks, { type: r.mimeType || 'audio/webm' }));
@@ -281,6 +345,7 @@ function setupMic() {
   };
   btn.addEventListener('pointerdown', start);
   btn.addEventListener('pointerup', stop); btn.addEventListener('pointerleave', stop); btn.addEventListener('pointercancel', stop);
+  btn.addEventListener('contextmenu', e => e.preventDefault());
 }
 
 window.__demo = { ask: id => ask(id), setPower: on => setPower(on), setNet: on => setNet(on), setInside: on => setInside(on), stage: () => stage };

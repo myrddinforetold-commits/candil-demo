@@ -1,5 +1,5 @@
 // Candil demo stage: the Rev C model in a room whose light can go out, a ring with states,
-// a live e-paper page, a finger that presses the ring, lid and exploded view.
+// a live e-paper page, a speak button that presses down, lid and exploded view.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -7,6 +7,8 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 const RING = new THREE.Vector3(0.086, 0.2012, 0.049);       // top of the speak button, model metres (glTF axes)
 const SCREEN = new THREE.Vector3(-0.024, 0.112, 0.083);
+const BASE_FOV = 24;                                         // vertical field of view for the clear area of the screen
+const TRAVEL = 0.0017;                                       // how far the speak button goes down
 const VIEWS = {
   hero:   { p: [0.40, 0.30, 0.60], t: [0.0, 0.10, 0.03] },
   ask:    { p: [0.26, 0.40, 0.42], t: [0.03, 0.15, 0.04] },
@@ -121,26 +123,19 @@ export async function mountStage(el, { glbBuffer, manifest, textures = {}, artic
   }
   applyExplode(0);
 
-  // the finger: a simple rounded form that comes in from the front right and holds the ring
-  const finger = new THREE.Group();
-  const skin = new THREE.MeshPhysicalMaterial({ color: '#c49a7c', roughness: 0.55, sheen: 0.5, sheenColor: new THREE.Color('#f3d2bf') });
-  const r0 = 0.0085, len = 0.075;
-  const digit = new THREE.Mesh(new THREE.CapsuleGeometry(r0, len, 8, 20), skin);
-  digit.position.y = r0 + len / 2; digit.scale.set(1, 1, 0.86); finger.add(digit);
-  const nail = new THREE.Mesh(new THREE.CapsuleGeometry(r0 * 0.62, 0.008, 4, 12), new THREE.MeshPhysicalMaterial({ color: '#e9cdbd', roughness: 0.25, clearcoat: 0.6 }));
-  nail.position.set(0, r0 + 0.007, -r0 * 0.62); nail.scale.set(1, 1, 0.35); finger.add(nail);
-  const fdir = new THREE.Vector3(0.38, 0.78, 0.5).normalize();      // from fingertip toward the hand
-  finger.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), fdir);
-  finger.visible = false; scene.add(finger);
-  const fingerAt = k => RING.clone().addScaledVector(fdir, 0.11 * k);   // k = 1 far, 0 touching
-
-  // framing
-  function resize() {
+  // framing: the device is framed in the part of the screen that the controls and answer panel leave clear
+  const frame = { t: 0, r: 0, b: 0, l: 0 }, frameT = { t: 0, r: 0, b: 0, l: 0 };
+  function applyFrame() {
     const w = el.clientWidth, h = el.clientHeight;
-    renderer.setSize(w, h, false); camera.aspect = w / h;
-    camera.fov = w / h < 0.9 ? 40 : 28; camera.updateProjectionMatrix();
+    renderer.setSize(w, h, false);
+    const fw = Math.max(80, w - frame.l - frame.r), fh = Math.max(80, h - frame.t - frame.b);
+    const fa = fw / fh, base = BASE_FOV * Math.PI / 180, minA = 1.3;
+    const designV = fa < minA ? 2 * Math.atan(Math.tan(base / 2) * minA / fa) : base;
+    camera.aspect = w / h;
+    camera.fov = 2 * Math.atan(Math.tan(designV / 2) * h / fh) * 180 / Math.PI;
+    camera.setViewOffset(w, h, w / 2 - (frame.l + fw / 2), h / 2 - (frame.t + fh / 2), w, h);
   }
-  new ResizeObserver(resize).observe(el); resize();
+  new ResizeObserver(applyFrame).observe(el); applyFrame();
   const box = new THREE.Box3().setFromObject(root);
   shadow.position.y = box.min.y - 0.0002;
   camera.position.fromArray(VIEWS.hero.p); controls.target.fromArray(VIEWS.hero.t);
@@ -154,9 +149,18 @@ export async function mountStage(el, { glbBuffer, manifest, textures = {}, artic
   }
 
   // animated state
-  const S = { power: 1, powerT: 1, front: 0, frontT: 0, ring: 'ready', press: 0, pressT: 0, fingerK: 1, fingerT: 1 };
+  const S = { power: 1, powerT: 1, front: 0, frontT: 0, ring: 'ready', btn: 0 };
+  const tweens = new Set();
+  const tween = (key, to, ms, fn) => new Promise(done => {
+    if (reduceMotion) { S[key] = to; done(); return; }
+    for (const t of tweens) if (t.key === key) tweens.delete(t);
+    tweens.add({ key, from: S[key], to, t0: performance.now(), ms, fn, done });
+  });
+  const inOut = t => t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2;
+  const outCubic = t => 1 - (1 - t) ** 3, inCubic = t => t ** 3;
+  const outBack = t => 1 + 2.4 * (t - 1) ** 3 + 1.4 * (t - 1) ** 2;
   let camAnim = null;
-  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches, reduce = reduceMotion;
   const ease = (a, b, dt, rate) => a + (b - a) * (reduce ? 1 : Math.min(1, dt * rate));
   const clock = new THREE.Clock();
 
@@ -178,12 +182,18 @@ export async function mountStage(el, { glbBuffer, manifest, textures = {}, artic
     for (const o of glow) if (o !== ring) o.material.emissiveIntensity = 0.15 + 0.9 * night;
     if (screenMat) screenMat.emissiveIntensity = 0.42 * S.front;
     spill.intensity = 0.03 * S.front * night;
-    // finger and button
-    S.fingerK = ease(S.fingerK, S.fingerT, dt, 5.5);
-    finger.visible = S.fingerK < 0.98;
-    S.press = ease(S.press, S.pressT, dt, 14);
-    for (const b of button) b.position.copy(b.userData.base).add(new THREE.Vector3(0, -0.0013 * S.press, 0));
-    finger.position.copy(fingerAt(S.fingerK)).add(new THREE.Vector3(0, -0.0013 * S.press, 0));
+    // tweens and the speak button
+    const now = performance.now();
+    for (const tw of tweens) {
+      const q = Math.min(1, (now - tw.t0) / tw.ms);
+      S[tw.key] = tw.from + (tw.to - tw.from) * tw.fn(q);
+      if (q >= 1) { tweens.delete(tw); tw.done(); }
+    }
+    let changed = false;
+    for (const k of ['t', 'r', 'b', 'l']) if (Math.abs(frame[k] - frameT[k]) > 0.3) { frame[k] = ease(frame[k], frameT[k], dt, 6); changed = true; }
+    if (changed) applyFrame();
+    const btn = Math.max(-0.3, Math.min(1, S.btn));
+    for (const b of button) b.position.copy(b.userData.base).add(new THREE.Vector3(0, -TRAVEL * btn, 0));
     if (camAnim) {
       camAnim.k = Math.min(1, camAnim.k + (reduce ? 1 : dt / camAnim.dur)); const e = camAnim.k < 0.5 ? 4 * camAnim.k ** 3 : 1 - (-2 * camAnim.k + 2) ** 3 / 2;
       camera.position.lerpVectors(camAnim.p0, camAnim.p1, e); controls.target.lerpVectors(camAnim.t0, camAnim.t1, e);
@@ -198,7 +208,9 @@ export async function mountStage(el, { glbBuffer, manifest, textures = {}, artic
     setOpen(open) { for (const a of arts) a.target = open ? 0 : a.closed * Math.PI / 180; },
     setClosedNow() { for (const a of arts) { a.target = a.angle = a.closed * Math.PI / 180; a.pivot.rotation.x = a.angle; } },
     setExplode(t) { explodeTarget = t; },
-    setPower(on) { S.powerT = on ? 1 : 0; },
+    setPower(on, now = false) { S.powerT = on ? 1 : 0; if (now) S.power = S.powerT; },
+    setLight(level) { S.power = S.powerT = level; },        // for flicker: sets the room light at once
+    setFrame(f) { Object.assign(frameT, f); },
     setFrontLight(level) { S.frontT = level; },
     setRing(state) { S.ring = state; },
     redrawPage() { pageTex.needsUpdate = true; },
@@ -206,8 +218,10 @@ export async function mountStage(el, { glbBuffer, manifest, textures = {}, artic
       const v = VIEWS[name]; if (!v) return;
       camAnim = { p0: camera.position.clone(), t0: controls.target.clone(), p1: new THREE.Vector3(...v.p), t1: new THREE.Vector3(...v.t), k: 0, dur };
     },
-    async press() { S.fingerT = 0; await wait(520); S.pressT = 1; await wait(120); },
-    async release() { S.pressT = 0; await wait(120); S.fingerT = 1; await wait(450); },
+    // press: the button goes down quickly and stops at the bottom of its travel; resolves at the click
+    async press() { await tween('btn', 1, 90, inCubic); },
+    // release: the button springs back up, overshooting a touch
+    async release() { await tween('btn', 0, 320, outBack); },
     dispose() { cancelAnimationFrame(raf); controls.dispose(); renderer.dispose(); renderer.domElement.remove(); },
   };
 }
