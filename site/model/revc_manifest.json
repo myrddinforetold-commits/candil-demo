@@ -1,0 +1,1113 @@
+[
+ {
+  "id": "p000",
+  "name": "Unibody shell, die-cast magnesium, powder-coated",
+  "mat": "shell",
+  "group": "shell",
+  "explode": [
+   0.0,
+   0.0,
+   -0.3
+  ]
+ },
+ {
+  "id": "p001",
+  "name": "Back cover",
+  "mat": "shell",
+  "group": "shell",
+  "explode": [
+   0.0,
+   0.0,
+   -0.43
+  ]
+ },
+ {
+  "id": "p002",
+  "name": "Back cover screw (Torx T8)",
+  "mat": "steel",
+  "group": "shell",
+  "explode": [
+   0.0,
+   0.0,
+   -0.43
+  ]
+ },
+ {
+  "id": "p003",
+  "name": "Back cover screw (Torx T8)",
+  "mat": "steel",
+  "group": "shell",
+  "explode": [
+   0.0,
+   0.0,
+   -0.43
+  ]
+ },
+ {
+  "id": "p004",
+  "name": "Back cover screw (Torx T8)",
+  "mat": "steel",
+  "group": "shell",
+  "explode": [
+   0.0,
+   0.0,
+   -0.43
+  ]
+ },
+ {
+  "id": "p005",
+  "name": "Back cover screw (Torx T8)",
+  "mat": "steel",
+  "group": "shell",
+  "explode": [
+   0.0,
+   0.0,
+   -0.43
+  ]
+ },
+ {
+  "id": "p006",
+  "name": "Rating plate",
+  "mat": "steel",
+  "group": "shell",
+  "explode": [
+   0.0,
+   0.0,
+   -0.43
+  ]
+ },
+ {
+  "id": "p007",
+  "name": "Latch strike, stainless pin and housing",
+  "mat": "steel",
+  "group": "shell",
+  "explode": [
+   0.0,
+   0.0,
+   -0.3
+  ]
+ },
+ {
+  "id": "p008",
+  "name": "Cover glass, 1.1 mm strengthened",
+  "mat": "glass",
+  "group": "display",
+  "explode": [
+   0.0,
+   0.0,
+   0.47000000000000003
+  ]
+ },
+ {
+  "id": "p009",
+  "name": "Front light guide, 0.5 mm PMMA, edge-lit",
+  "mat": "glass",
+  "group": "display",
+  "explode": [
+   0.0,
+   0.0,
+   0.43
+  ]
+ },
+ {
+  "id": "p010",
+  "name": "Front light LEDs, warm and cool white",
+  "mat": "led",
+  "group": "display",
+  "explode": [
+   0.0,
+   0.0,
+   0.43
+  ]
+ },
+ {
+  "id": "p011",
+  "name": "E-paper module 7.8 in, 1872 x 1404",
+  "mat": "eink",
+  "group": "display",
+  "explode": [
+   0.0,
+   0.0,
+   0.39
+  ]
+ },
+ {
+  "id": "p012",
+  "name": "E-paper active area",
+  "mat": "eink_active",
+  "group": "display",
+  "explode": [
+   0.0,
+   0.0,
+   0.39
+  ]
+ },
+ {
+  "id": "p013",
+  "name": "Ambient light sensor",
+  "mat": "lens",
+  "group": "display",
+  "explode": [
+   0.0,
+   0.0,
+   0.3
+  ]
+ },
+ {
+  "id": "p014",
+  "name": "Display carrier and heat shield, magnesium",
+  "mat": "mag",
+  "group": "display",
+  "explode": [
+   0.0,
+   0.0,
+   0.32
+  ]
+ },
+ {
+  "id": "p015",
+  "name": "E-paper flex cable",
+  "mat": "copper",
+  "group": "display",
+  "explode": [
+   0.0,
+   0.0,
+   0.39
+  ]
+ },
+ {
+  "id": "p016",
+  "name": "Heatsink contact block (stock, Framework)",
+  "mat": "copper",
+  "group": "thermal",
+  "explode": [
+   0.0,
+   0.0,
+   0.17
+  ]
+ },
+ {
+  "id": "p017",
+  "name": "Heatsink base plate",
+  "mat": "alu",
+  "group": "thermal",
+  "explode": [
+   0.0,
+   0.0,
+   0.23
+  ]
+ },
+ {
+  "id": "p018",
+  "name": "Heatsink fins (stock, Framework)",
+  "mat": "alu",
+  "group": "thermal",
+  "explode": [
+   0.0,
+   0.0,
+   0.23
+  ]
+ },
+ {
+  "id": "p019",
+  "name": "Heat pipe 6 mm",
+  "mat": "copper",
+  "group": "thermal",
+  "explode": [
+   0.0,
+   0.0,
+   0.23
+  ]
+ },
+ {
+  "id": "p020",
+  "name": "Heat pipe 6 mm",
+  "mat": "copper",
+  "group": "thermal",
+  "explode": [
+   0.0,
+   0.0,
+   0.23
+  ]
+ },
+ {
+  "id": "p021",
+  "name": "Heat pipe 6 mm",
+  "mat": "copper",
+  "group": "thermal",
+  "explode": [
+   0.0,
+   0.0,
+   0.23
+  ]
+ },
+ {
+  "id": "p022",
+  "name": "Heat pipe 6 mm",
+  "mat": "copper",
+  "group": "thermal",
+  "explode": [
+   0.0,
+   0.0,
+   0.23
+  ]
+ },
+ {
+  "id": "p023",
+  "name": "Heatsink mounting screw and spring",
+  "mat": "steel",
+  "group": "thermal",
+  "explode": [
+   0.0,
+   0.0,
+   0.23
+  ]
+ },
+ {
+  "id": "p024",
+  "name": "Heatsink mounting screw and spring",
+  "mat": "steel",
+  "group": "thermal",
+  "explode": [
+   0.0,
+   0.0,
+   0.23
+  ]
+ },
+ {
+  "id": "p025",
+  "name": "Heatsink mounting screw and spring",
+  "mat": "steel",
+  "group": "thermal",
+  "explode": [
+   0.0,
+   0.0,
+   0.23
+  ]
+ },
+ {
+  "id": "p026",
+  "name": "Heatsink mounting screw and spring",
+  "mat": "steel",
+  "group": "thermal",
+  "explode": [
+   0.0,
+   0.0,
+   0.23
+  ]
+ },
+ {
+  "id": "p027",
+  "name": "Fan, Noctua NF-A12x25 G2 PWM (120 x 25 mm)",
+  "mat": "fan",
+  "group": "thermal",
+  "explode": [
+   0.0,
+   0.0,
+   0.15
+  ]
+ },
+ {
+  "id": "p028",
+  "name": "Fan rotor",
+  "mat": "dark",
+  "group": "thermal",
+  "explode": [
+   0.0,
+   0.0,
+   0.15
+  ]
+ },
+ {
+  "id": "p029",
+  "name": "Fan plenum seal, foam (right and top; left and bottom open to intake)",
+  "mat": "rubber",
+  "group": "thermal",
+  "explode": [
+   0.0,
+   0.0,
+   0.12
+  ]
+ },
+ {
+  "id": "p030",
+  "name": "Exhaust baffle under the fins, aluminium",
+  "mat": "alu",
+  "group": "thermal",
+  "explode": [
+   0.0,
+   -0.04,
+   0.23
+  ]
+ },
+ {
+  "id": "p031",
+  "name": "Mainboard PCB (Framework Desktop)",
+  "mat": "pcb",
+  "group": "board",
+  "explode": [
+   0.0,
+   0.0,
+   0.04
+  ]
+ },
+ {
+  "id": "p032",
+  "name": "Rear I/O connectors",
+  "mat": "steel",
+  "group": "board",
+  "explode": [
+   0.0,
+   0.0,
+   0.04
+  ]
+ },
+ {
+  "id": "p033",
+  "name": "Mainboard brackets and fixings",
+  "mat": "steel",
+  "group": "board",
+  "explode": [
+   0.0,
+   0.0,
+   0.04
+  ]
+ },
+ {
+  "id": "p034",
+  "name": "NVMe SSD (M.2 2280) x2",
+  "mat": "dram",
+  "group": "board",
+  "explode": [
+   0.0,
+   0.0,
+   0.04
+  ]
+ },
+ {
+  "id": "p035",
+  "name": "Thermal pads and insulators",
+  "mat": "black",
+  "group": "board",
+  "explode": [
+   0.0,
+   0.0,
+   0.04
+  ]
+ },
+ {
+  "id": "p036",
+  "name": "SSD labels",
+  "mat": "label",
+  "group": "board",
+  "explode": [
+   0.0,
+   0.0,
+   0.04
+  ]
+ },
+ {
+  "id": "p037",
+  "name": "LPDDR5X memory",
+  "mat": "dram",
+  "group": "board",
+  "explode": [
+   0.0,
+   0.0,
+   0.04
+  ]
+ },
+ {
+  "id": "p038",
+  "name": "Ryzen AI Max APU",
+  "mat": "soc",
+  "group": "board",
+  "explode": [
+   0.0,
+   0.0,
+   0.04
+  ]
+ },
+ {
+  "id": "p039",
+  "name": "Mainboard connectors",
+  "mat": "black",
+  "group": "board",
+  "explode": [
+   0.0,
+   0.0,
+   0.04
+  ]
+ },
+ {
+  "id": "p040",
+  "name": "Mainboard components",
+  "mat": "dark",
+  "group": "board",
+  "explode": [
+   0.0,
+   0.0,
+   0.04
+  ]
+ },
+ {
+  "id": "p041",
+  "name": "Fire and heat barrier, mica",
+  "mat": "mag",
+  "group": "power",
+  "explode": [
+   0.0,
+   0.0,
+   -0.14
+  ]
+ },
+ {
+  "id": "p042",
+  "name": "Pack housing, left",
+  "mat": "battery",
+  "group": "power",
+  "explode": [
+   -0.23,
+   0.0,
+   -0.3
+  ]
+ },
+ {
+  "id": "p043",
+  "name": "Cells, left pack: 8 x ENIX 26650 LiFePO4 (4S2P)",
+  "mat": "cell",
+  "group": "power",
+  "explode": [
+   -0.3,
+   0.0,
+   -0.3
+  ]
+ },
+ {
+  "id": "p044",
+  "name": "Nickel strips, left pack",
+  "mat": "steel",
+  "group": "power",
+  "explode": [
+   -0.3,
+   0.0,
+   -0.3
+  ]
+ },
+ {
+  "id": "p045",
+  "name": "BMS, left pack (Daly 4S 20 A, 60 x 35 x 10 mm)",
+  "mat": "board_green",
+  "group": "power",
+  "explode": [
+   -0.3,
+   0.0,
+   -0.36
+  ]
+ },
+ {
+  "id": "p046",
+  "name": "Pack end cap, left",
+  "mat": "shell_light",
+  "group": "power",
+  "explode": [
+   -0.23,
+   0.0,
+   -0.3
+  ]
+ },
+ {
+  "id": "p047",
+  "name": "Pack pull tab, left",
+  "mat": "orange",
+  "group": "power",
+  "explode": [
+   -0.23,
+   0.0,
+   -0.3
+  ]
+ },
+ {
+  "id": "p048",
+  "name": "Pack contact block, left",
+  "mat": "black",
+  "group": "power",
+  "explode": [
+   -0.23,
+   0.0,
+   -0.3
+  ]
+ },
+ {
+  "id": "p049",
+  "name": "Pack housing, right",
+  "mat": "battery",
+  "group": "power",
+  "explode": [
+   0.23,
+   0.0,
+   -0.3
+  ]
+ },
+ {
+  "id": "p050",
+  "name": "Cells, right pack: 8 x ENIX 26650 LiFePO4 (4S2P)",
+  "mat": "cell",
+  "group": "power",
+  "explode": [
+   0.3,
+   0.0,
+   -0.3
+  ]
+ },
+ {
+  "id": "p051",
+  "name": "Nickel strips, right pack",
+  "mat": "steel",
+  "group": "power",
+  "explode": [
+   0.3,
+   0.0,
+   -0.3
+  ]
+ },
+ {
+  "id": "p052",
+  "name": "BMS, right pack (Daly 4S 20 A, 60 x 35 x 10 mm)",
+  "mat": "board_green",
+  "group": "power",
+  "explode": [
+   0.3,
+   0.0,
+   -0.36
+  ]
+ },
+ {
+  "id": "p053",
+  "name": "Pack end cap, right",
+  "mat": "shell_light",
+  "group": "power",
+  "explode": [
+   0.23,
+   0.0,
+   -0.3
+  ]
+ },
+ {
+  "id": "p054",
+  "name": "Pack pull tab, right",
+  "mat": "orange",
+  "group": "power",
+  "explode": [
+   0.23,
+   0.0,
+   -0.3
+  ]
+ },
+ {
+  "id": "p055",
+  "name": "Pack contact block, right",
+  "mat": "black",
+  "group": "power",
+  "explode": [
+   0.23,
+   0.0,
+   -0.3
+  ]
+ },
+ {
+  "id": "p056",
+  "name": "Pack connector, blind-mate",
+  "mat": "dark",
+  "group": "power",
+  "explode": [
+   0.0,
+   0.0,
+   -0.3
+  ]
+ },
+ {
+  "id": "p057",
+  "name": "Speaker, Visaton FRS 5 XWP (52.5 mm, 35 deep)",
+  "mat": "dark",
+  "group": "io",
+  "explode": [
+   0.12,
+   0.0,
+   0.15
+  ]
+ },
+ {
+  "id": "p058",
+  "name": "Speaker cone",
+  "mat": "black",
+  "group": "io",
+  "explode": [
+   0.12,
+   0.0,
+   0.15
+  ]
+ },
+ {
+  "id": "p059",
+  "name": "Speaker magnet",
+  "mat": "steel",
+  "group": "io",
+  "explode": [
+   0.12,
+   0.0,
+   0.15
+  ]
+ },
+ {
+  "id": "p060",
+  "name": "Speaker box, sealed",
+  "mat": "plastic",
+  "group": "io",
+  "explode": [
+   0.12,
+   0.0,
+   0.09
+  ]
+ },
+ {
+  "id": "p061",
+  "name": "Controller, Raspberry Pi Zero 2 W (65 x 30 mm)",
+  "mat": "board_green",
+  "group": "io",
+  "explode": [
+   0.13,
+   0.06,
+   -0.04
+  ]
+ },
+ {
+  "id": "p062",
+  "name": "GPIO header, 40 pin",
+  "mat": "black",
+  "group": "io",
+  "explode": [
+   0.13,
+   0.06,
+   -0.06
+  ]
+ },
+ {
+  "id": "p063",
+  "name": "E-paper driver, Waveshare IT8951 HAT (B) (65.15 x 56.21 mm)",
+  "mat": "board_green",
+  "group": "io",
+  "explode": [
+   0.13,
+   0.06,
+   -0.08
+  ]
+ },
+ {
+  "id": "p064",
+  "name": "DC-ATX supply, HDPLEX 500W HiFi (160 x 52 x 31 mm)",
+  "mat": "alu",
+  "group": "io",
+  "explode": [
+   0.13,
+   -0.04,
+   -0.04
+  ]
+ },
+ {
+  "id": "p065",
+  "name": "Always-on controller, Raspberry Pi Pico 2 (51 x 21 mm)",
+  "mat": "board_green",
+  "group": "io",
+  "explode": [
+   0.13,
+   -0.06,
+   -0.0
+  ]
+ },
+ {
+  "id": "p066",
+  "name": "Power board: MPPT charger, pack switching",
+  "mat": "board_green",
+  "group": "io",
+  "explode": [
+   -0.13,
+   0.0,
+   -0.0
+  ]
+ },
+ {
+  "id": "p067",
+  "name": "Sealed port plate: 2 x USB-C PD, XT60 DC in",
+  "mat": "dark",
+  "group": "io",
+  "explode": [
+   0.11,
+   0.0,
+   -0.0
+  ]
+ },
+ {
+  "id": "p068",
+  "name": "USB-C receptacle",
+  "mat": "steel",
+  "group": "io",
+  "explode": [
+   0.11,
+   0.0,
+   -0.0
+  ]
+ },
+ {
+  "id": "p069",
+  "name": "USB-C receptacle",
+  "mat": "steel",
+  "group": "io",
+  "explode": [
+   0.11,
+   0.0,
+   -0.0
+  ]
+ },
+ {
+  "id": "p070",
+  "name": "XT60 DC inlet",
+  "mat": "orange",
+  "group": "io",
+  "explode": [
+   0.11,
+   0.0,
+   -0.0
+  ]
+ },
+ {
+  "id": "p071",
+  "name": "Port door, silicone",
+  "mat": "rubber",
+  "group": "io",
+  "explode": [
+   0.16,
+   0.0,
+   -0.0
+  ]
+ },
+ {
+  "id": "p072",
+  "name": "Camera window, glass",
+  "mat": "glass",
+  "group": "io",
+  "explode": [
+   0.0,
+   0.0,
+   0.47000000000000003
+  ]
+ },
+ {
+  "id": "p073",
+  "name": "Camera, 12 MP USB (model to decide)",
+  "mat": "board_green",
+  "group": "io",
+  "explode": [
+   0.0,
+   0.0,
+   0.33
+  ]
+ },
+ {
+  "id": "p074",
+  "name": "Camera lens",
+  "mat": "lens",
+  "group": "io",
+  "explode": [
+   0.0,
+   0.0,
+   0.33
+  ]
+ },
+ {
+  "id": "p075",
+  "name": "Torch LED 3 W, high-CRI",
+  "mat": "led",
+  "group": "io",
+  "explode": [
+   0.0,
+   0.0,
+   0.33
+  ]
+ },
+ {
+  "id": "p076",
+  "name": "Torch driver board",
+  "mat": "board_green",
+  "group": "io",
+  "explode": [
+   0.0,
+   0.0,
+   0.33
+  ]
+ },
+ {
+  "id": "p077",
+  "name": "Mic array, XVF3800 (board size to confirm)",
+  "mat": "board_green",
+  "group": "io",
+  "explode": [
+   0.0,
+   0.12,
+   -0.0
+  ]
+ },
+ {
+  "id": "p078",
+  "name": "Speak ring, photoluminescent",
+  "mat": "orange",
+  "group": "shell",
+  "explode": [
+   0.0,
+   0.09,
+   -0.3
+  ]
+ },
+ {
+  "id": "p079",
+  "name": "Ring band, reflective white",
+  "mat": "reflect",
+  "group": "shell",
+  "explode": [
+   0.0,
+   0.09,
+   -0.3
+  ]
+ },
+ {
+  "id": "p080",
+  "name": "Speak button, EAO 82-6151.1134 (25 mm front, ring-lit)",
+  "mat": "steel",
+  "group": "shell",
+  "explode": [
+   0.0,
+   0.09,
+   -0.3
+  ]
+ },
+ {
+  "id": "p081",
+  "name": "Speak button body, nut and switch element (about 37.5 mm deep, to confirm)",
+  "mat": "dark",
+  "group": "shell",
+  "explode": [
+   0.0,
+   0.06,
+   -0.3
+  ]
+ },
+ {
+  "id": "p082",
+  "name": "Foot",
+  "mat": "rubber",
+  "group": "shell",
+  "explode": [
+   0.0,
+   0.0,
+   -0.3
+  ]
+ },
+ {
+  "id": "p083",
+  "name": "Foot",
+  "mat": "rubber",
+  "group": "shell",
+  "explode": [
+   0.0,
+   0.0,
+   -0.3
+  ]
+ },
+ {
+  "id": "p084",
+  "name": "Foot",
+  "mat": "rubber",
+  "group": "shell",
+  "explode": [
+   0.0,
+   0.0,
+   -0.3
+  ]
+ },
+ {
+  "id": "p085",
+  "name": "Foot",
+  "mat": "rubber",
+  "group": "shell",
+  "explode": [
+   0.0,
+   0.0,
+   -0.3
+  ]
+ },
+ {
+  "id": "p086",
+  "name": "Hinge knuckles, case side",
+  "mat": "shell",
+  "group": "shell",
+  "explode": [
+   0.0,
+   0.0,
+   -0.3
+  ]
+ },
+ {
+  "id": "p087",
+  "name": "Bail handle, 10 mm aluminium tube",
+  "mat": "steel",
+  "group": "handle",
+  "explode": [
+   0.0,
+   0.14,
+   -0.3
+  ]
+ },
+ {
+  "id": "p088",
+  "name": "Handle grip",
+  "mat": "rubber",
+  "group": "handle",
+  "explode": [
+   0.0,
+   0.14,
+   -0.3
+  ]
+ },
+ {
+  "id": "p089",
+  "name": "Handle pivot boss",
+  "mat": "shell_light",
+  "group": "handle",
+  "explode": [
+   0.0,
+   0.14,
+   -0.3
+  ]
+ },
+ {
+  "id": "p090",
+  "name": "Handle pivot post",
+  "mat": "shell_light",
+  "group": "handle",
+  "explode": [
+   0.0,
+   0.14,
+   -0.3
+  ]
+ },
+ {
+  "id": "p091",
+  "name": "Handle pivot boss",
+  "mat": "shell_light",
+  "group": "handle",
+  "explode": [
+   0.0,
+   0.14,
+   -0.3
+  ]
+ },
+ {
+  "id": "p092",
+  "name": "Handle pivot post",
+  "mat": "shell_light",
+  "group": "handle",
+  "explode": [
+   0.0,
+   0.14,
+   -0.3
+  ]
+ },
+ {
+  "id": "p093",
+  "name": "Lid, magnesium; open it is a front foot",
+  "mat": "shell",
+  "group": "lid",
+  "explode": [
+   0.0,
+   0.0,
+   0.56
+  ]
+ },
+ {
+  "id": "p094",
+  "name": "Lid print (inside), quick guide",
+  "mat": "card",
+  "group": "lid",
+  "explode": [
+   0.0,
+   0.0,
+   0.56
+  ]
+ },
+ {
+  "id": "p095",
+  "name": "Latch hook, stainless (springs up)",
+  "mat": "steel",
+  "group": "lid",
+  "explode": [
+   0.0,
+   0.0,
+   0.56
+  ]
+ },
+ {
+  "id": "p096",
+  "name": "Lid print (outside)",
+  "mat": "lid_label",
+  "group": "lid",
+  "explode": [
+   0.0,
+   0.0,
+   0.56
+  ]
+ },
+ {
+  "id": "p097",
+  "name": "Lid latch slider (slide down to open)",
+  "mat": "orange",
+  "group": "lid",
+  "explode": [
+   0.0,
+   0.0,
+   0.56
+  ]
+ },
+ {
+  "id": "p098",
+  "name": "Lid gasket, silicone",
+  "mat": "rubber",
+  "group": "lid",
+  "explode": [
+   0.0,
+   0.0,
+   0.56
+  ]
+ },
+ {
+  "id": "p099",
+  "name": "Hinge pin, stainless, full width",
+  "mat": "steel",
+  "group": "lid",
+  "explode": [
+   0.0,
+   0.0,
+   0.56
+  ]
+ },
+ {
+  "id": "p100",
+  "name": "Hinge knuckles, lid side",
+  "mat": "shell",
+  "group": "lid",
+  "explode": [
+   0.0,
+   0.0,
+   0.56
+  ]
+ }
+]

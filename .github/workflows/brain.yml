@@ -1,0 +1,41 @@
+name: Candil brain (Modal)
+on:
+  push:
+    branches: [main]
+    paths: ['brain/**', '.github/workflows/brain.yml']
+  workflow_dispatch:
+    inputs:
+      task:
+        description: 'deploy, setup-library or ask'
+        default: deploy
+      question:
+        description: 'question for ask'
+        default: 'The Wi-Fi is out. What should I do?'
+      tier:
+        description: 'quick or deep'
+        default: quick
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+      MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install modal
+      - name: Download the library pack into the Modal volume
+        if: github.event_name == 'workflow_dispatch' && inputs.task == 'setup-library'
+        run: modal run brain/candil_brain.py::setup_library
+      - name: Deploy
+        if: github.event_name == 'push' || inputs.task == 'deploy'
+        run: modal deploy brain/candil_brain.py
+      - name: Ask one question
+        if: github.event_name == 'workflow_dispatch' && inputs.task == 'ask'
+        env:
+          Q: ${{ inputs.question }}
+          TIER: ${{ inputs.tier }}
+        run: modal run brain/candil_brain.py::smoke --question "$Q" --tier "$TIER"
