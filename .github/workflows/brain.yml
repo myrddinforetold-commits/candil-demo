@@ -45,7 +45,7 @@ jobs:
               if c.get('App Name') == 'candil-brain' or 'candil-brain' in json.dumps(c):
                   cid = c.get('Container ID') or c.get('container_id')
                   print('stopping', cid)
-                  subprocess.run(['modal', 'container', 'stop', cid])
+                  subprocess.run(['modal', 'container', 'stop', '--yes', cid])
           PY
       - name: Ask one question
         if: github.event_name == 'workflow_dispatch' && inputs.task == 'ask'
