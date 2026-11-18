@@ -235,6 +235,20 @@ class Brain:
             st = self.assistant.model_status()
             return {'ok': st['online'], 'model': st['model'], 'library': LIB}
 
+        @api.get('/debug/model')
+        def debug_model(tier: str = 'quick', stream: int = 1):
+            # temporary: what the relay sends back for a tiny question, as lastbook would see it
+            import json, urllib.request
+            body = {'model': tier, 'messages': [{'role': 'user', 'content': 'Say hello in five words.'}], 'stream': bool(stream),
+                    'max_tokens': 300, 'reasoning_effort': 'low'}
+            req = urllib.request.Request('http://127.0.0.1:19443/v1/chat/completions', json.dumps(body).encode(), {'Content-Type': 'application/json'})
+            try:
+                with urllib.request.urlopen(req, timeout=120) as r:
+                    raw = r.read().decode('utf-8', 'replace')
+                return {'status': 200, 'raw': raw[:6000]}
+            except Exception as e:
+                return {'error': repr(e), 'body': getattr(e, 'read', lambda: b'')().decode('utf-8', 'replace')[:3000]}
+
         @api.post('/ask')
         async def ask(audio: UploadFile | None = File(None), question: str | None = Form(None), tier: str = Form('quick')):
             t0 = time.time(); heard_s = None
