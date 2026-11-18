@@ -205,7 +205,12 @@ class Brain:
             print('voice off:', e); self.tts = None
 
     def hear(self, path):
-        segs, _ = self.stt.transcribe(path, beam_size=1, vad_filter=True, language='en')
+        # Decode with ffmpeg ourselves: faster-whisper's PyAV decoder breaks on newer PyAV releases.
+        import subprocess, numpy as np
+        pcm = subprocess.run(['ffmpeg', '-v', 'error', '-i', path, '-ac', '1', '-ar', '16000', '-f', 'f32le', '-'],
+                             capture_output=True, check=True).stdout
+        samples = np.frombuffer(pcm, dtype=np.float32)
+        segs, _ = self.stt.transcribe(samples, beam_size=1, vad_filter=True, language='en')
         return ' '.join(s.text.strip() for s in segs).strip()
 
     def speak(self, text):
