@@ -159,13 +159,25 @@ def to_page(md, sources):
         steps = [clean(l[2:]) for l in lines if l.startswith(('- ', '* '))]
     head = next((clean(l) for l in lines if l and not l.startswith(('#', '-', '*', '|')) and not re.match(r'^\d+[.)]', l)), '')
     head = re.split(r'(?<=[.!?])\s', head, 1)[0] if head else (steps[0] if steps else '')
+    warning = ''
+    m = re.search(r'(?im)^\**\s*warnings?\b.*$', md)
+    if m:
+        for l in md[m.end():].splitlines():
+            l = l.strip()
+            if l.startswith(('* ', '- ')) or re.match(r'^\d+[.)]\s', l):
+                w = clean(re.sub(r'^(\*|-|\d+[.)])\s*', '', l))
+                w = re.sub(r'^[^:]{2,40}:\s*', '', w)          # drop a label such as "Carbon monoxide danger:"
+                warning = re.split(r'(?<=[.!?])\s', w, 1)[0]
+                break
+            if l and not l.startswith(('*', '-')) and warning == '' and l.lower().startswith(('not found', 'my own')):
+                break
     src = sources[0] if sources else {}
     name = src.get('title') or src.get('publisher') or 'the Candil library'
     if src.get('publisher') and src.get('title') and src['publisher'] not in src['title']:
         name = f"{src['publisher']}: {src['title']}"
     if src.get('page'):
         name += f", page {src['page']}"
-    return {'headline': head, 'steps': steps[:6], 'source': name}
+    return {'headline': head, 'steps': steps[:6], 'warning': warning, 'source': name}
 
 
 # ------------------------------------------------------------------ the web endpoint
@@ -253,8 +265,16 @@ class Brain:
             except Exception as e:
                 return {'error': repr(e), 'body': getattr(e, 'read', lambda: b'')().decode('utf-8', 'replace')[:3000]}
 
+        @api.post('/speak')
+        def speak(text: str = Form(...)):
+            from fastapi import Response
+            import base64
+            b64 = self.speak(text.strip()[:600])
+            return Response(base64.b64decode(b64) if b64 else b'', media_type='audio/mpeg')
+
         @api.post('/ask')
-        async def ask(audio: UploadFile | None = File(None), question: str | None = Form(None), tier: str = Form('quick')):
+        async def ask(audio: UploadFile | None = File(None), question: str | None = Form(None), tier: str = Form('quick'),
+                      voice: int = Form(1)):
             t0 = time.time(); heard_s = None
             if audio is not None:
                 with tempfile.NamedTemporaryFile(suffix='.' + (audio.filename or 'q.mp3').rsplit('.', 1)[-1]) as f:
@@ -269,9 +289,9 @@ class Brain:
             if 'error' in out:
                 return {'question': question, **out}
             p = out['page']
-            spoken = ' '.join([p['headline']] + [f'{i + 1}. {s}' for i, s in enumerate(p['steps'])])
+            spoken = ' '.join([p['headline']] + [f'{i + 1}. {s}' for i, s in enumerate(p['steps'])] + ([f"Warning. {p['warning']}"] if p.get('warning') else []))
             t1 = time.time()
-            return {'question': question, 'model': MODEL_LABEL[tier], **out, 'voice_mp3_b64': self.speak(spoken),
+            return {'question': question, 'model': MODEL_LABEL[tier], **out, 'voice_mp3_b64': self.speak(spoken) if voice else None,
                     'timing': {'heard_s': heard_s, 'answer_s': out.get('latency', {}).get('total_s'),
                                'voice_s': round(time.time() - t1, 2), 'total_s': round(time.time() - t0, 2)}}
 

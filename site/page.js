@@ -99,7 +99,9 @@ export class PageScreen {
       g.font = `400 ${Math.round(50 * s)}px ${SANS}`;
       const steps = a.steps.map(t => this.wrap(t, W - 2 * M - 110 * s));
       const lh = Math.round(62 * s), gap = Math.round(30 * s), hh = Math.round(110 * s);
-      const total = hl.length * hh + 50 * s + steps.reduce((n, l) => n + l.length * lh + gap, 0);
+      g.font = `600 ${Math.round(48 * s)}px ${SANS}`;
+      const warn = a.warning ? this.wrap(a.warning, W - 2 * M - 110 * s) : [];
+      const total = hl.length * hh + 50 * s + steps.reduce((n, l) => n + l.length * lh + gap, 0) + (warn.length ? warn.length * lh + 30 * s : 0);
       if (top + total < H - 200 || s <= 0.55) {
         let y = top + Math.round(92 * s);
         g.font = `600 ${Math.round(100 * s)}px ${SANS}`; g.fillStyle = INK;
@@ -115,6 +117,15 @@ export class PageScreen {
           ls.forEach(l => { g.fillText(l, M + Math.round(110 * s), y); y += lh; });
           y += gap;
         });
+        if (warn.length) {   // the source's most important warning, set apart
+          y += Math.round(10 * s);
+          const r = Math.round(33 * s), cx = M + r + 3, cy = y - Math.round(17 * s);
+          g.fillStyle = INK; g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fill();
+          g.font = `700 ${Math.round(40 * s)}px ${SANS}`; g.fillStyle = PAPER; g.textAlign = 'center'; g.textBaseline = 'middle';
+          g.fillText('!', cx, cy + 2); g.textAlign = 'left'; g.textBaseline = 'alphabetic'; g.fillStyle = INK;
+          g.font = `600 ${Math.round(48 * s)}px ${SANS}`;
+          warn.forEach(l => { g.fillText(l, M + Math.round(110 * s), y); y += lh; });
+        }
         break;
       }
     }

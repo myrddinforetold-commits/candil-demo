@@ -7,8 +7,9 @@ const PACK_WH = 198, USABLE = 0.9, READY_W = 9, QUICK_WH = 0.18, CHARGE = 0.86;
 const usableWh = PACK_WH * USABLE * CHARGE;
 const EST_HOURS = Math.round(usableWh / READY_W);
 const EST_ANSWERS = Math.round(usableWh / QUICK_WH / 50) * 50;
-// When the live software is connected this points at its /ask endpoint; until then the sample answers below are shown.
-const LIVE_URL = null;
+// The Candil brain on Modal: lastbook's engine, Whisper and Candil's voice. If it cannot be reached, the sample answers are shown.
+const BRAIN = 'https://myrddinforetold--candil-brain-brain-web.us-east.modal.run';
+fetch(BRAIN + '/health').catch(() => {});   // wakes the brain while the page loads
 
 const SCENARIOS = {
   wifi: {
@@ -129,18 +130,51 @@ async function listen(sc, onWords, primed) {
   });
 }
 
-async function getAnswer(sc, audio) {
-  if (LIVE_URL) {
-    // live software: send the same audio the visitor just heard; the server writes it out, searches and answers
-    const t0 = performance.now();
-    const body = new FormData();
-    body.append('audio', await (await fetch(sc.audio)).blob(), 'question.mp3');
-    const r = await fetch(LIVE_URL, { method: 'POST', body });
+async function getAnswer(sc, blob) {
+  // the same recording the visitor just heard goes to the brain: it writes it out, searches the library and answers
+  const t0 = performance.now();
+  const body = new FormData();
+  body.append('audio', blob || await (await fetch(sc.audio)).blob(), blob ? 'question.webm' : 'question.mp3');
+  body.append('tier', 'quick'); body.append('voice', '0');
+  const slow = setTimeout(() => toast('Waking the cloud brain. The first answer takes longer.'), 9000);
+  try {
+    const r = await fetch(BRAIN + '/ask', { method: 'POST', body });
     const a = await r.json();
-    return { ...a, ms: performance.now() - t0, live: true };
+    if (a.error || !a.page) throw new Error(a.error || 'no answer');
+    return { question: a.question, ...a.page, md: a.answer_md, sources: a.sources || [], model: a.model, timing: a.timing,
+             ms: performance.now() - t0, live: true };
+  } catch (e) {
+    console.warn('brain:', e);
+    if (!sc) return { question: '', headline: 'I could not reach the Candil brain just now.', steps: ['Please try again in a moment.'], source: '—', live: false, failed: true };
+    return { question: sc.question, ...sc.sample, live: false, failed: true };
+  } finally { clearTimeout(slow); }
+}
+
+async function speakAnswer(a) {
+  // Candil's own voice, sentence by sentence: the next part is made while this one plays
+  const parts = [a.headline, ...a.steps.map((t, i) => `${i + 1}. ${t}`), ...(a.warning ? ['Warning. ' + a.warning] : [])].filter(Boolean);
+  const get = text => { const f = new FormData(); f.append('text', text); return fetch(BRAIN + '/speak', { method: 'POST', body: f }).then(r => r.blob()).catch(() => null); };
+  let next = get(parts[0]);
+  for (let i = 0; i < parts.length; i++) {
+    const blob = await next;
+    next = i + 1 < parts.length ? get(parts[i + 1]) : null;
+    if (!blob || !blob.size) continue;
+    const au = new Audio(URL.createObjectURL(blob));
+    await new Promise(res => { au.onended = res; au.onerror = res; au.play().catch(res); });
   }
-  await wait(1800);
-  return { question: sc.question, ...sc.sample, live: false };
+}
+
+function showAnswer(a) {
+  const src = (a.sources || []).slice(0, 4).map(s => `<li>${esc(s.title || '')}${s.publisher ? ' · ' + esc(s.publisher) : ''}${s.page ? ', p. ' + s.page : ''}</li>`).join('');
+  showPanel(`
+    <h3>Candil heard</h3><div class="q">“${esc(a.question)}”</div>
+    <h3>Answer</h3>
+    ${a.live ? '' : '<div class="note">' + (a.failed ? 'The cloud brain did not answer, so this is the sample text.' : 'Sample answer.') + '</div>'}
+    <div class="hl">${esc(a.headline)}</div>
+    <ol>${a.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol>
+    ${a.warning ? `<div class="hl" style="font-size:17px">⚠ ${esc(a.warning)}</div>` : ''}
+    ${src ? `<h3>Sources in the library</h3><ol class="src">${src}</ol>` : `<div class="src">Source: ${esc(a.source)}</div>`}
+    <div class="meta">${a.live ? `Real Candil software · ${esc(a.model || '')}<br>Heard in ${a.timing?.heard_s ?? '–'} s · answered in ${a.timing?.answer_s ?? '–'} s` : 'Live software: not reached'}<br>Internet: ${world.net ? 'on' : 'out'} · Power: ${world.power ? 'on' : 'out'}</div>`);
 }
 
 async function ask(id) {
@@ -167,17 +201,10 @@ async function ask(id) {
     drawPage({ mode: 'thinking', question: sc.question });
     const a = await getAnswer(sc);
     stage.setRing('answering');
-    drawPage({ mode: 'answer', answer: { question: a.question || sc.question, headline: a.headline, steps: a.steps, source: a.source } });
+    drawPage({ mode: 'answer', answer: { question: a.question || sc.question, headline: a.headline, steps: a.steps, warning: a.warning, source: a.source } });
     stage.view('read', 1.6);
-    showPanel(`
-      <h3>Candil heard</h3><div class="q">“${esc(a.question || sc.question)}”</div>
-      <h3>Answer</h3>
-      ${a.live ? '' : '<div class="note">Sample answer. In the next step the real Candil software writes this from its library, and reads it aloud.</div>'}
-      <div class="hl">${esc(a.headline)}</div>
-      <ol>${a.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol>
-      <div class="src">Source: ${esc(a.source)}</div>
-      <div class="meta">${a.live ? `Answered in ${(a.ms / 1000).toFixed(1)} s · ${esc(a.model || '')}` : 'Live software: not connected yet'}<br>Internet: ${world.net ? 'on' : 'out'} · Power: ${world.power ? 'on' : 'out'}</div>`);
-    await wait(9000);
+    showAnswer(a);
+    if (a.live) await speakAnswer(a); else await wait(6000);
     stage.setRing('ready');
   } finally {
     busy = false; document.querySelectorAll('button.ask').forEach(b => b.disabled = false);
@@ -215,6 +242,46 @@ async function start() {
   $('b-lid').addEventListener('click', () => setLid(!world.lid));
   $('b-inside').addEventListener('click', () => setInside(!world.inside));
   document.querySelectorAll('button.ask').forEach(b => b.addEventListener('click', () => ask(b.dataset.scenario)));
+  setupMic();
 }
+// ---------------------------------------------------------------- ask your own: hold to talk
+function setupMic() {
+  const btn = $('b-mic');
+  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) { btn.title = 'This browser cannot record'; return; }
+  btn.disabled = false; btn.title = 'Hold to talk, let go to ask';
+  btn.innerHTML = '<span class="dot"></span>Hold to ask your own';
+  let rec = null, chunks = [], stream = null, t0 = 0;
+  const start = async e => {
+    e.preventDefault();
+    if (busy || rec) return;
+    busy = true;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    catch { busy = false; toast('Microphone access was not allowed.'); return; }
+    if (!world.lid) { setLid(true); }
+    $('panel').classList.remove('on');
+    stage.view('ask', 0.9); stage.press(); stage.setRing('listening');
+    drawPage({ mode: 'listening', heard: '' });
+    chunks = []; rec = new MediaRecorder(stream); rec.ondataavailable = ev => ev.data.size && chunks.push(ev.data); rec.start(); t0 = performance.now();
+    btn.setAttribute('aria-pressed', 'true');
+  };
+  const stop = async () => {
+    if (!rec) return;
+    const r = rec; rec = null; btn.setAttribute('aria-pressed', 'false');
+    await new Promise(res => { r.onstop = res; r.stop(); });
+    stream.getTracks().forEach(t => t.stop());
+    await stage.release();
+    if (performance.now() - t0 < 700) { stage.setRing('ready'); drawPage({ mode: 'ready' }); busy = false; toast('Hold the button while you talk.'); return; }
+    stage.setRing('thinking'); drawPage({ mode: 'thinking', question: '…' });
+    const a = await getAnswer(null, new Blob(chunks, { type: r.mimeType || 'audio/webm' }));
+    stage.setRing('answering');
+    drawPage({ mode: 'answer', answer: { question: a.question || '…', headline: a.headline, steps: a.steps, warning: a.warning, source: a.source } });
+    stage.view('read', 1.4); showAnswer(a);
+    if (a.live) await speakAnswer(a);
+    stage.setRing('ready'); busy = false;
+  };
+  btn.addEventListener('pointerdown', start);
+  btn.addEventListener('pointerup', stop); btn.addEventListener('pointerleave', stop); btn.addEventListener('pointercancel', stop);
+}
+
 window.__demo = { ask: id => ask(id), setPower: on => setPower(on), setNet: on => setNet(on), setInside: on => setInside(on), stage: () => stage };
 start().catch(e => { $('loading').textContent = 'The 3D model could not load in this browser.'; console.error(e); });
