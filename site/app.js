@@ -144,7 +144,7 @@ $('panel-x').addEventListener('click', hidePanel);
 // keep the device framed in the part of the screen the header, controls and answer panel leave clear
 function updateFrame() {
   if (!stage) return;
-  const W = innerWidth, H = innerHeight, phone = W <= 700;
+  const W = innerWidth, H = innerHeight, phone = W <= 900;
   const dock = $('dock').getBoundingClientRect();
   document.documentElement.style.setProperty('--dock-h', Math.round(dock.height) + 'px');
   const hud = $('hud').classList.contains('on') ? $('hud').getBoundingClientRect().bottom : 0;
