@@ -154,9 +154,21 @@ def to_page(md, sources):
     import re
     clean = lambda s: re.sub(r'\s+([.,;:!?])', r'\1', re.sub(r'\s+', ' ', re.sub(r'\*\*|__|`|\s*\[(?:S|M)\d+\]', '', s))).strip()
     lines = [l.strip() for l in md.splitlines()]
-    steps = [clean(re.sub(r'^\d+[.)]\s*', '', l)) for l in lines if re.match(r'^\d+[.)]\s+', l)]
+    # Lines under "Not found in the library", "My own reasoning", "Sources disagree" or "Warnings" never become steps.
+    is_item = lambda l: bool(re.match(r'^([-*]\s|\d+[.)]\s)', l))
+    body, skip = [], False
+    for l in lines:
+        if l and not is_item(l):
+            bare = re.sub(r'[#*_]', '', l).strip().lower()
+            if l.startswith('#') or bare.endswith(':'):
+                skip = bare.startswith(('not found', 'my own reasoning', 'sources disagree', 'warning'))
+                continue
+        if not skip:
+            body.append(l)
+    steps = [clean(re.sub(r'^\d+[.)]\s*', '', l)) for l in body if re.match(r'^\d+[.)]\s+', l)]
     if not steps:
-        steps = [clean(l[2:]) for l in lines if l.startswith(('- ', '* '))]
+        steps = [clean(l[2:]) for l in body if l.startswith(('- ', '* '))]
+    steps = [re.sub(r'^[^:]{2,40}:\s*', '', st) if ':' in st[:42] else st for st in steps]
     head = next((clean(l) for l in lines if l and not l.startswith(('#', '-', '*', '|')) and not re.match(r'^\d+[.)]', l)), '')
     head = re.split(r'(?<=[.!?])\s', head, 1)[0] if head else (steps[0] if steps else '')
     warning = ''
@@ -194,7 +206,13 @@ class Brain:
         server.init(no_index=True)
         assistant.SYSTEM += ('\n\nThis answer is shown on Candil, a small offline device with an e-paper page and a voice. '
                              'Begin with one short sentence that answers the question. Then give at most 6 numbered steps of '
-                             'one sentence each, most urgent first, each ending with its source key. Then the warnings.')
+                             'one sentence each, most urgent first, each ending with its source key. Then the warnings.'
+                             '\n\nCandil is kept for emergencies. When the person says the internet, Wi-Fi, phone network or power '
+                             'is out, treat it as a possible wider outage, not only a fault in their home network: before answering, '
+                             'call search_library for how to stay informed and communicate when networks are down (for example a '
+                             'battery or hand-crank radio, emergency alerts, texting instead of calling, saving phone battery, a '
+                             'family communication plan) and answer from what that finds, alongside any quick check of the home '
+                             'equipment the library gives.')
         self.assistant, self.lock = assistant, threading.Lock()
         from faster_whisper import WhisperModel
         self.stt = WhisperModel(WHISPER, device='cpu', compute_type='int8', download_root='/models/whisper')
