@@ -86,6 +86,16 @@ def setup_library(pack: str = 'small'):
     print('library ready at', LIB, flush=True)
 
 
+@app.function(image=image, volumes={DATA: vol}, timeout=3 * 3600, cpu=2, memory=4096)
+def ensure_library(pack: str = 'small'):
+    """Quick when the library is already in the volume; otherwise downloads it (first deploy only)."""
+    import os
+    if os.path.exists(LIB + '/library-data/catalog.json'):
+        print('library present:', LIB, flush=True)
+        return
+    setup_library.local(pack)
+
+
 # ------------------------------------------------------------------ relay to OpenRouter (loopback only)
 def start_relay(api_key):
     import json, threading, httpx

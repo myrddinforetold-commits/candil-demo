@@ -26,10 +26,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: '3.12' }
+      - name: Check the Modal token is set
+        run: test -n "$MODAL_TOKEN_ID" || { echo "Add MODAL_TOKEN_ID and MODAL_TOKEN_SECRET under Settings > Secrets and variables > Actions"; exit 1; }
       - run: pip install modal
-      - name: Download the library pack into the Modal volume
-        if: github.event_name == 'workflow_dispatch' && inputs.task == 'setup-library'
-        run: modal run brain/candil_brain.py::setup_library
+      - name: Library in the Modal volume (downloads only the first time)
+        if: github.event_name == 'push' || inputs.task == 'deploy' || inputs.task == 'setup-library'
+        run: modal run brain/candil_brain.py::ensure_library
       - name: Deploy
         if: github.event_name == 'push' || inputs.task == 'deploy'
         run: modal deploy brain/candil_brain.py
