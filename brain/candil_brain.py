@@ -221,6 +221,7 @@ def to_page(md, sources):
         raw = [r for r in raw if re.search(r'\[S\d+\]', r)]
     steps = [clean(re.sub(r'\[(?:Note|Source)[^\]]*\]', '', r)) for r in raw]
     steps = [re.sub(r'^[^:]{2,40}:\s*', '', st) if ':' in st[:42] else st for st in steps]
+    steps = [st[:1].upper() + st[1:] for st in steps if st]
     head = next((clean(l) for l in lines if l and not l.startswith(('#', '-', '*', '|')) and not re.match(r'^\d+[.)]', l)), '')
     sents = re.split(r'(?<=[.!?])\s', head) if head else []
     sorry = re.compile(r"^(i am sorry|i'm sorry|sorry|unfortunately|i cannot|i can't|i can not|the library does not|the library doesn't)", re.I)
@@ -267,7 +268,12 @@ class Brain:
                              'library:" at the end. Every numbered step is a complete instruction that says what to do, never '
                              'a fragment, a definition or a fact on its own. If the initial results do not directly answer the '
                              'question, call search_library again with the task in plain words (for example "start a fire '
-                             'without matches") before answering.'
+                             'without matches") before answering. Use at most two extra searches, and answer as soon as you have '
+                             'enough.'
+                             '\n\nAnswer for the situation the person describes. Never assume a disaster they have not mentioned '
+                             '(such as a nuclear attack, fallout, a pandemic or a flood) and leave out advice that belongs only to '
+                             'one. When the power is out, leave out anything that needs mains electricity, such as electric '
+                             'heaters.'
                              '\n\nCandil is kept for emergencies. When the person says the internet, Wi-Fi, phone network or power '
                              'is out, treat it as a possible wider outage, not only a fault in their home network: before answering, '
                              'call search_library for how to stay informed and communicate when networks are down (for example a '
