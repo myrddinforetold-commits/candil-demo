@@ -95,6 +95,25 @@ def setup_library(pack: str = 'small'):
     print('library ready at', LIB, flush=True)
 
 
+@app.function(image=image, volumes={DATA: vol}, timeout=3 * 3600, cpu=16, memory=16384)
+def build_index():
+    """Lastbook's meaning-based search. Packs ship without the embedding model, so fetch BAAI bge-small-en-v1.5 (ONNX,
+    MIT licence, the official BAAI repository) into the library, then embed every document once with lastbook's own
+    retrieval.py. Afterwards the brain searches by meaning as well as by keyword."""
+    import os, shutil, subprocess, sys
+    from huggingface_hub import hf_hub_download
+    dst = LIB + '/derived/models/bge-small-en-v1.5'
+    os.makedirs(dst, exist_ok=True)
+    for src, name in (('onnx/model.onnx', 'model.onnx'), ('tokenizer.json', 'tokenizer.json')):
+        if not os.path.exists(f'{dst}/{name}'):
+            shutil.copy(hf_hub_download('BAAI/bge-small-en-v1.5', src), f'{dst}/{name}')
+    vol.commit()
+    r = subprocess.run([sys.executable, 'retrieval.py'], cwd='/app/lastbook', env={**os.environ, 'LASTBOOK_DATA': LIB})
+    vol.commit()
+    print('index build exit', r.returncode, flush=True)
+    return r.returncode
+
+
 @app.function(image=image, volumes={DATA: vol}, timeout=3 * 3600, cpu=2, memory=4096)
 def ensure_library(pack: str = 'small'):
     """Quick when the library is already in the volume; otherwise downloads it (first deploy only)."""
@@ -149,6 +168,13 @@ def start_relay(api_key):
 
 
 # ------------------------------------------------------------------ answer -> page
+def question_parts(question):
+    """The separate questions in one spoken request, when there is more than one."""
+    import re
+    parts = [p.strip() for p in re.split(r'(?<=[?.!])\s+', question) if len(p.strip()) > 12]
+    return parts if len(parts) > 1 else []
+
+
 def outage_search(question):
     """For questions about the internet or phone network being down: an extra library search for staying informed."""
     import re
@@ -196,7 +222,10 @@ def to_page(md, sources):
     steps = [clean(re.sub(r'\[(?:Note|Source)[^\]]*\]', '', r)) for r in raw]
     steps = [re.sub(r'^[^:]{2,40}:\s*', '', st) if ':' in st[:42] else st for st in steps]
     head = next((clean(l) for l in lines if l and not l.startswith(('#', '-', '*', '|')) and not re.match(r'^\d+[.)]', l)), '')
-    head = re.split(r'(?<=[.!?])\s', head, 1)[0] if head else (steps[0] if steps else '')
+    sents = re.split(r'(?<=[.!?])\s', head) if head else []
+    sorry = re.compile(r"^(i am sorry|i'm sorry|sorry|unfortunately|i cannot|i can't|i can not|the library does not|the library doesn't)", re.I)
+    sents = [x for x in sents if not sorry.match(x)]
+    head = sents[0] if sents else (steps[0] if steps else '')
     warning = ''
     m = re.search(r'(?im)^\**\s*warnings?\b.*$', md)
     if m:
@@ -233,6 +262,12 @@ class Brain:
         assistant.SYSTEM += ('\n\nThis answer is shown on Candil, a small offline device with an e-paper page and a voice. '
                              'Begin with one short sentence that answers the question. Then give at most 6 numbered steps of '
                              'one sentence each, most urgent first, each ending with its source key. Then the warnings.'
+                             '\n\nThe first sentence gives the most useful thing to do, taken from the library. Never begin with '
+                             'an apology or with what the library lacks; anything missing goes only under "Not found in the '
+                             'library:" at the end. Every numbered step is a complete instruction that says what to do, never '
+                             'a fragment, a definition or a fact on its own. If the initial results do not directly answer the '
+                             'question, call search_library again with the task in plain words (for example "start a fire '
+                             'without matches") before answering.'
                              '\n\nCandil is kept for emergencies. When the person says the internet, Wi-Fi, phone network or power '
                              'is out, treat it as a possible wider outage, not only a fault in their home network: before answering, '
                              'call search_library for how to stay informed and communicate when networks are down (for example a '
@@ -276,22 +311,25 @@ class Brain:
             self.assistant.MODEL = tier
             A = self.assistant
             plain = A.hybrid
-            extra = outage_search(question)
+            extra = [q for q in [outage_search(question)] if q] + question_parts(question)
             if extra:
-                # Candil is an emergency device: "the Wi-Fi is out" may be a wider outage, so the first library
-                # search also looks for how to stay informed and in touch. Those pages come first; the answer
-                # is still written only from what the library returns.
+                # The first library search also runs for each part of a multi-part question and, for "the Wi-Fi
+                # is out", for how to stay informed during an outage (Candil is an emergency device). The best
+                # results of each search are taken in turn; the answer is still written only from what they return.
                 first = {'done': False}
                 def hybrid(q, k=8, *a, **kw):
                     hits = plain(q, k, *a, **kw)
                     if first['done'] or q != question[:300]:
                         return hits
                     first['done'] = True
+                    lists = [plain(e, k) for e in extra] + [hits]
                     seen, out = set(), []
-                    for h in plain(extra, k) + hits:
-                        key = (h.get('doc_id'), h.get('page'))
-                        if key not in seen:
-                            seen.add(key); out.append(h)
+                    for rank in range(k):                          # take the best of each search in turn
+                        for lst in lists:
+                            if rank < len(lst):
+                                h = lst[rank]; key = (h.get('doc_id'), h.get('page'))
+                                if key not in seen:
+                                    seen.add(key); out.append(h)
                     return out[:k]
                 A.hybrid = hybrid
             try:
@@ -366,6 +404,23 @@ class Brain:
                                'voice_s': round(time.time() - t1, 2), 'total_s': round(time.time() - t0, 2)}}
 
         return api
+
+
+@app.local_entrypoint()
+def trial(tier: str = 'deep', questions: str = ''):
+    """Ask several questions (separated by |) and print what Candil's page would show, for checking answer quality."""
+    Brain = modal.Cls.from_name('candil-brain', 'Brain')
+    b = Brain()
+    for q in [x.strip() for x in questions.split('|') if x.strip()]:
+        out = b.ask_text.remote(q, tier)
+        p = out.get('page') or {}
+        print(f"\n=== {q}   [{tier}, {out.get('seconds')} s]", flush=True)
+        print('HEADLINE:', p.get('headline'))
+        for i, st in enumerate(p.get('steps') or [], 1):
+            print(f'  {i}. {st}')
+        print('WARNING:', p.get('warning'))
+        print('SOURCES:', ' | '.join(f"{x.get('publisher')}: {x.get('title')} p{x.get('page')}" for x in (out.get('sources') or [])[:6]))
+        print('SEARCHES:', [t.get('args', {}).get('query') for t in (out.get('tools') or [])], flush=True)
 
 
 @app.local_entrypoint()
