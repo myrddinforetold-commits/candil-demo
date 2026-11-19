@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: 'deploy, setup-library, build-index, ask, trial (questions separated by |) probe-pack (question = pack id) or setup-full'
+        description: 'deploy, setup-library, build-index, ask, trial (questions separated by |) probe-pack (question = pack id), setup-full or job-logs (question = app id)'
         default: deploy
       question:
         description: 'question for ask'
@@ -66,3 +66,22 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.task == 'setup-full'
         timeout-minutes: 340
         run: modal run --detach brain/candil_brain.py::setup_full_library
+      - name: Show a running job's latest log lines
+        if: github.event_name == 'workflow_dispatch' && inputs.task == 'job-logs'
+        env:
+          APP: ${{ inputs.question }}
+        run: |
+          modal container list --json > c.json || echo '[]' > c.json
+          python3 - <<'PY'
+          import json, os, subprocess
+          app = os.environ['APP']
+          found = False
+          for c in json.load(open('c.json')):
+              if c.get('app_id') == app:
+                  found = True
+                  print('container', c.get('container_id'), 'started', c.get('start_time'), flush=True)
+                  subprocess.run(['modal', 'container', 'logs', c['container_id'], '-n', '60'])
+          if not found:
+              print('no running container for', app)
+              subprocess.run(['modal', 'app', 'list'])
+          PY
