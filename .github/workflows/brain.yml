@@ -61,7 +61,11 @@ jobs:
         env:
           PACK: ${{ inputs.question }}
         run: |
-          if [ "$PACK" = "status" ]; then python3 brain/lastbook_pack.py status; else python3 brain/lastbook_pack.py probe "${PACK:-all}"; fi
+          case "$PACK" in
+            status) python3 brain/lastbook_pack.py status ;;
+            speed-*) python3 brain/lastbook_pack.py speed "${PACK#speed-}" ;;
+            *) python3 brain/lastbook_pack.py probe "${PACK:-all}" ;;
+          esac
       - name: Fetch the full library without videos or maps, then index it
         if: github.event_name == 'workflow_dispatch' && inputs.task == 'setup-full'
         timeout-minutes: 340

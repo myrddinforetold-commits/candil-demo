@@ -242,9 +242,26 @@ def status():
             print(label, type(ex).__name__, ex)
 
 
+def speed(pack_id, seconds=45):
+    """Plain download (no range) of a pack for a short while, to measure how fast the server sends it."""
+    files, _ = pack_files(pack_id)
+    req = urllib.request.Request(files[0]['url'], headers=UA)
+    t0, n = time.time(), 0
+    with urllib.request.urlopen(req, timeout=60) as r:
+        print(pack_id, r.status, {k: v for k, v in r.headers.items() if k.lower() in ('content-length', 'cf-cache-status', 'server')}, flush=True)
+        while time.time() - t0 < seconds:
+            b = r.read(4 << 20)
+            if not b:
+                break
+            n += len(b)
+    print(f'{pack_id}: {n / 1e6 / (time.time() - t0):.1f} MB/s over {time.time() - t0:.0f} s', flush=True)
+
+
 if __name__ == '__main__':
     if sys.argv[1] == 'status':
         status()
+    if sys.argv[1] == 'speed':
+        speed(sys.argv[2])
     if sys.argv[1] == 'probe':
         files, meta = pack_files(sys.argv[2])
         print('pack', json.dumps({k: v for k, v in meta.items() if k != 'files'})[:600])
