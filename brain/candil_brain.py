@@ -702,6 +702,7 @@ def trial(tier: str = 'deep', questions: str = ''):
         for i, st in enumerate(p.get('steps') or [], 1):
             print(f'  {i}. {st}')
         print('WARNING:', p.get('warning'))
+        print('SHOWN SOURCE:', p.get('source'))
         print('SOURCES:', ' | '.join(f"{x.get('publisher')}: {x.get('title')} p{x.get('page')}" for x in (out.get('sources') or [])[:6]))
         print('TOOLS:', [f"{t.get('name')}: {t.get('args', {}).get('query') or t.get('args', {}).get('doc_id')} -> {(t.get('summary') or {}).get('count')}" for t in (out.get('tools') or [])], flush=True)
 
