@@ -6,7 +6,7 @@ downloading the videos. Every extracted file is checked against the CRC-32 the Z
 
     python3 lastbook_pack.py probe all          # what is in the pack, by folder and type
 """
-import json, os, struct, sys, threading, time, urllib.request, zlib
+import json, os, struct, sys, threading, time, urllib.error, urllib.request, zlib
 from concurrent.futures import ThreadPoolExecutor
 
 BASE = 'https://downloads.lastbook.org/'
@@ -212,7 +212,23 @@ def extract(url, entries, dest, size, log=print, after_span=None):
     log(f'done: {got / 1e9:.1f} GB in {time.time() - t0:.0f} s', flush=True)
 
 
+def status():
+    """One small request each: the manifest, and the first byte of each pack. Shows what the server answers."""
+    for label, url, rng in [('manifest', BASE + 'manifest-v1.json', None)] + [
+            (p['id'], f['url'], 'bytes=0-0') for p in manifest()['packs'] for f in p['files']]:
+        h = dict(UA, **({'Range': rng} if rng else {}))
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=60) as r:
+                print(label, r.status, {k: v for k, v in r.headers.items() if k.lower() in ('content-range', 'retry-after', 'server', 'cf-cache-status', 'x-cache')})
+        except urllib.error.HTTPError as ex:
+            print(label, ex.code, {k: v for k, v in ex.headers.items() if k.lower() in ('retry-after', 'server', 'cf-ray', 'x-cache')}, ex.read()[:300])
+        except Exception as ex:
+            print(label, type(ex).__name__, ex)
+
+
 if __name__ == '__main__':
+    if sys.argv[1] == 'status':
+        status()
     if sys.argv[1] == 'probe':
         files, meta = pack_files(sys.argv[2])
         print('pack', json.dumps({k: v for k, v in meta.items() if k != 'files'})[:600])
