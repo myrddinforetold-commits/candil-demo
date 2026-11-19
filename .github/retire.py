@@ -5,18 +5,16 @@ must never be stopped by a deploy. If the app list cannot be read, nothing is st
 import json, subprocess
 
 apps = json.loads(subprocess.run(['modal', 'app', 'list', '--json'], capture_output=True, text=True).stdout or '[]')
-for a in apps:
-    if 'candil' in json.dumps(a):
-        print('app', json.dumps(a))
-ids = {a.get('App ID') for a in apps
-       if 'candil-brain' in str(a.get('Description')) and 'deployed' in str(a.get('State')).lower()}
+key = lambda d, *names: next((d[n] for n in names if n in d), None)
+ids = {key(a, 'app_id', 'App ID') for a in apps
+       if key(a, 'description', 'Description') == 'candil-brain' and str(key(a, 'state', 'State')).lower() == 'deployed'}
 ids.discard(None)
 print('deployed app:', ids or 'not found, so nothing is stopped')
 conts = json.loads(subprocess.run(['modal', 'container', 'list', '--json'], capture_output=True, text=True).stdout or '[]')
 for c in conts:
-    if ids and (c.get('App ID') or c.get('app_id')) in ids:
-        cid = c.get('Container ID') or c.get('container_id')
+    if ids and key(c, 'app_id', 'App ID') in ids:
+        cid = key(c, 'container_id', 'Container ID')
         print('stopping', cid)
         subprocess.run(['modal', 'container', 'stop', '--yes', cid])
     else:
-        print('leaving', c.get('Container ID') or c.get('container_id'), c.get('App ID') or c.get('app_id'))
+        print('leaving', key(c, 'container_id', 'Container ID'), key(c, 'app_id', 'App ID'))
