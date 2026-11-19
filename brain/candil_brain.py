@@ -545,7 +545,7 @@ def trial(tier: str = 'deep', questions: str = ''):
             print(f'  {i}. {st}')
         print('WARNING:', p.get('warning'))
         print('SOURCES:', ' | '.join(f"{x.get('publisher')}: {x.get('title')} p{x.get('page')}" for x in (out.get('sources') or [])[:6]))
-        print('SEARCHES:', [t.get('args', {}).get('query') for t in (out.get('tools') or [])], flush=True)
+        print('TOOLS:', [f"{t.get('name')}: {t.get('args', {}).get('query') or t.get('args', {}).get('doc_id')} -> {(t.get('summary') or {}).get('count')}" for t in (out.get('tools') or [])], flush=True)
 
 
 @app.local_entrypoint()
