@@ -482,10 +482,14 @@ def to_page(md, sources):
     steps = [re.sub(r'^[^:]{2,40}:\s*', '', st) if ':' in st[:42] else st for st in steps]
     steps = [st[:1].upper() + st[1:] for st in steps if st]
     head = next((clean(l) for l in lines if l and not l.startswith(('#', '-', '*', '|')) and not re.match(r'^\d+[.)]', l)), '')
-    sents = re.split(r'(?<=[.!?])\s', head) if head else []
+    # Sentence ends, but not after an initial or a short title ("Franklin D. Roosevelt", "Dr. Ruiz", "U.S. Army").
+    SENT = r'(?<=[.!?])(?<!\b[A-Z]\.)(?<!\b(?:Dr|Mr|Ms|St|Mt|vs)\.)\s'
+    sents = re.split(SENT, head) if head else []
     sorry = re.compile(r"^(i am sorry|i'm sorry|sorry|unfortunately|i cannot|i can't|i can not|the library does not|the library doesn't)", re.I)
     sents = [x for x in sents if not sorry.match(x)]
     head = sents[0] if sents else (steps[0] if steps else '')
+    if steps and head and steps[0][:60].lower() == head[:60].lower():
+        steps = steps[1:]                                      # the headline already says it
     warning = ''
     m = re.search(r'(?im)^\**\s*warnings?\b.*$', md)
     if m:
@@ -494,7 +498,7 @@ def to_page(md, sources):
             if l.startswith(('* ', '- ')) or re.match(r'^\d+[.)]\s', l):
                 w = clean(re.sub(r'^(\*|-|\d+[.)])\s*', '', l))
                 w = re.sub(r'^[^:]{2,40}:\s*', '', w)          # drop a label such as "Carbon monoxide danger:"
-                warning = re.split(r'(?<=[.!?])\s', w, 1)[0]
+                warning = re.split(SENT, w, 1)[0]
                 break
             if l and not l.startswith(('*', '-')) and warning == '' and l.lower().startswith(('not found', 'my own')):
                 break
