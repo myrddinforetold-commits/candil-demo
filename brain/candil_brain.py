@@ -519,7 +519,8 @@ class Brain:
                              'searches the offline encyclopedias (Wikipedia, Wikibooks, WikiMed, Appropedia). Prefer the manuals '
                              'and health guides for safety steps; cite encyclopedia passages with their source keys too.'
                              '\n\nKeep every step true to its source, including any condition the source attaches to it '
-                             '(for example, advice for when the internet works but the mobile network does not). Leave out a '
+                             '(for example, advice for when the internet works but the mobile network does not), and keep every '
+                             'direction and timing exactly as the source gives it (day or night, open or close, before or after). Leave out a '
                              'step whose condition does not fit the person\'s situation.')
         self.assistant, self.lock = assistant, threading.Lock()
         from faster_whisper import WhisperModel
