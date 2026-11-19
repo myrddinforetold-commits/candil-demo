@@ -280,7 +280,7 @@ def start_relay(api_key):
                 req['reasoning'] = {'effort': 'none', 'exclude': True}
             else:                 # DeepSeek thinks a little; its thinking counts against the token budget
                 req['reasoning'] = {'effort': 'low', 'exclude': True}
-                req['max_tokens'] = max(int(req.get('max_tokens') or 0), 4000)
+                req['max_tokens'] = max(int(req.get('max_tokens') or 0), 8000)   # room to think after reading whole pages
             req['provider'] = {'data_collection': 'deny', 'ignore': ['DeepSeek']}   # hosts that keep no data; not DeepSeek's own servers
             hdr = {'Authorization': f'Bearer {api_key}', 'HTTP-Referer': 'https://candil-demo.vercel.app', 'X-Title': 'Candil demo', 'Accept-Encoding': 'identity'}
             with httpx.Client(timeout=httpx.Timeout(180, connect=20)) as c:
@@ -481,7 +481,9 @@ def to_page(md, sources):
     steps = [clean(re.sub(r'\[(?:Note|Source)[^\]]*\]', '', r)) for r in raw]
     steps = [re.sub(r'^[^:]{2,40}:\s*', '', st) if ':' in st[:42] else st for st in steps]
     steps = [st[:1].upper() + st[1:] for st in steps if st]
-    head = next((clean(l) for l in lines if l and not l.startswith(('#', '-', '*', '|')) and not re.match(r'^\d+[.)]', l)), '')
+    label = re.compile(r'^\W*(not found|my own reasoning|sources disagree|warnings?)\b', re.I)   # section notes, not a headline
+    head = next((clean(l) for l in lines if l and not l.startswith(('#', '-', '*', '|')) and not re.match(r'^\d+[.)]', l)
+                 and not label.match(l)), '')
     # Sentence ends, but not after an initial or a short title ("Franklin D. Roosevelt", "Dr. Ruiz", "U.S. Army").
     SENT = r'(?<=[.!?])(?<!\b[A-Z]\.)(?<!\b(?:Dr|Mr|Ms|St|Mt|vs)\.)\s'
     sents = re.split(SENT, head) if head else []
@@ -547,7 +549,9 @@ class Brain:
                              '\n\nFor background knowledge the manuals do not cover (what a plant, animal, illness, medicine or '
                              'material is, how something works, history and geography), call search_encyclopedia, which '
                              'searches the offline encyclopedias (Wikipedia, Wikibooks, WikiMed, Appropedia). Prefer the manuals '
-                             'and health guides for safety steps; cite encyclopedia passages with their source keys too.'
+                             'and health guides for safety steps; cite encyclopedia passages with their source keys too. A general-knowledge '
+                             'question (a person, place, event, idea) is in scope: answer it fully from the encyclopedias, with '
+                             'the key facts as the numbered points, and never call it out of scope or not an emergency.'
                              '\n\nKeep every step true to its source, including any condition the source attaches to it '
                              '(for example, advice for when the internet works but the mobile network does not), and keep every '
                              'direction and timing exactly as the source gives it (day or night, open or close, before or after). Leave out a '
