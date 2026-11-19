@@ -238,7 +238,10 @@ class Brain:
                              'call search_library for how to stay informed and communicate when networks are down (for example a '
                              'battery or hand-crank radio, emergency alerts, texting instead of calling, saving phone battery, a '
                              'family communication plan) and answer from what that finds, alongside any quick check of the home '
-                             'equipment the library gives.')
+                             'equipment the library gives.'
+                             '\n\nKeep every step true to its source, including any condition the source attaches to it '
+                             '(for example, advice for when the internet works but the mobile network does not). Leave out a '
+                             'step whose condition does not fit the person\'s situation.')
         self.assistant, self.lock = assistant, threading.Lock()
         from faster_whisper import WhisperModel
         self.stt = WhisperModel(WHISPER, device='cpu', compute_type='int8', download_root='/models/whisper')
