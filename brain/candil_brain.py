@@ -12,7 +12,9 @@ import modal
 
 LASTBOOK_COMMIT = '9542e80fbdb6e6ee2a0472beabab0bbd706f0c15'
 DATA = '/data'
-LIB = DATA + '/LastbookData'
+SMALL_LIB = DATA + '/LastbookData'          # lastbook's small library (the first one)
+MED_LIB = DATA + '/medium/LastbookData'    # the medium library without its videos or its California map
+LIB = MED_LIB                              # the library Candil answers from
 MODELS = {'quick': 'google/gemma-4-26b-a4b-it', 'deep': 'deepseek/deepseek-v4-flash-0731'}
 MODEL_LABEL = {'quick': 'Quick · Gemma 4 26B', 'deep': 'Deep · DeepSeek V4 Flash'}
 WHISPER = 'small.en'
@@ -88,12 +90,12 @@ def setup_library(pack: str = 'small'):
             z.extractall(unpack)
     cat = next(unpack.rglob('library-data/catalog.json'))
     root = cat.parent.parent
-    shutil.rmtree(LIB, ignore_errors=True)
-    shutil.move(str(root), LIB)
-    (Path(LIB) / 'derived').mkdir(exist_ok=True)
+    shutil.rmtree(SMALL_LIB, ignore_errors=True)
+    shutil.move(str(root), SMALL_LIB)
+    (Path(SMALL_LIB) / 'derived').mkdir(exist_ok=True)
     shutil.rmtree(work)
     vol.commit()
-    print('library ready at', LIB, flush=True)
+    print('library ready at', SMALL_LIB, flush=True)
 
 
 @app.function(image=image, volumes={DATA: vol}, timeout=6 * 3600, cpu=32, memory=32768)
@@ -126,7 +128,6 @@ def build_index(lib: str = LIB):
 
 
 FULL_LIB = DATA + '/full/LastbookData'     # the full library without its videos or its US maps
-MED_LIB = DATA + '/medium/LastbookData'    # the medium library without its videos or its California map
 
 
 @app.function(image=image, volumes={DATA: vol}, timeout=6 * 3600, cpu=4, memory=8192)
@@ -196,7 +197,7 @@ def fetch_encyclopedias():
         out = f'{dest}/{name}'
         if os.path.exists(out):
             print('already there:', name, flush=True); continue
-        mine = f'{LIB}/library-data/collections/{name}'
+        mine = f'{SMALL_LIB}/library-data/collections/{name}'
         if os.path.exists(mine):
             shutil.copyfile(mine, out); vol.commit(); print('copied from the small library:', name, flush=True); continue
         proj = name.split('_')[0]
@@ -249,7 +250,7 @@ def fetch_encyclopedias():
 def ensure_library(pack: str = 'small'):
     """Quick when the library is already in the volume; otherwise downloads it (first deploy only)."""
     import os
-    if os.path.exists(LIB + '/library-data/catalog.json'):
+    if os.path.exists(SMALL_LIB + '/library-data/catalog.json'):
         print('library present:', LIB, flush=True)
         return
     setup_library.local(pack)
