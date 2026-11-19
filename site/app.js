@@ -31,7 +31,7 @@ const SCENARIOS = {
   },
   cold: {
     world: 'power',
-    tier: 'quick',           // the quick model answers this well in about 5 s; the deeper one takes about 20 s
+    tier: 'deep',            // the deeper model gives the complete, prioritised answer
     audio: './audio/q-cold.mp3',
     question: 'The lights are out and we have no power. It’s cold here. What can we do to stay warm, what should we do right now, and what are the most important things?',
     sample: {
