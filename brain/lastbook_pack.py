@@ -15,8 +15,10 @@ VIDEO_EXT = ('.mp4', '.webm', '.mkv', '.mov', '.m4v', '.avi')
 
 
 def manifest():
-    with urllib.request.urlopen(urllib.request.Request(BASE + 'manifest-v1.json', headers=UA), timeout=60) as r:
-        return json.load(r)
+    def go():
+        with urllib.request.urlopen(urllib.request.Request(BASE + 'manifest-v1.json', headers=UA), timeout=60) as r:
+            return json.load(r)
+    return patient(go, 'manifest')
 
 
 def pack_files(pack_id):
@@ -25,25 +27,39 @@ def pack_files(pack_id):
     return p['files'], p
 
 
-def get_range(url, start, end, tries=6):
-    for i in range(tries):
+def patient(fn, what):
+    """Run fn, waiting longer each time the server is busy or the connection fails (it asks for patience with 503)."""
+    for i in range(12):
         try:
-            req = urllib.request.Request(url, headers={**UA, 'Range': f'bytes={start}-{end}'})
-            with urllib.request.urlopen(req, timeout=120) as r:
-                if r.status != 206:
-                    raise IOError(f'server answered {r.status}, not a partial response: ranges unsupported')
-                return r.read()
-        except Exception:
-            if i == tries - 1:
+            return fn()
+        except Exception as ex:
+            if i == 11:
                 raise
-            time.sleep(2 * (i + 1))
+            wait = min(300, 10 * 2 ** i)
+            ra = getattr(ex, 'headers', None) and ex.headers.get('Retry-After')
+            if ra and str(ra).isdigit():
+                wait = max(wait, int(ra))
+            print(f'{what}: busy ({type(ex).__name__}: {ex}); waiting {wait} s', flush=True)
+            time.sleep(wait)
+
+
+def get_range(url, start, end, tries=None):
+    def go():
+        req = urllib.request.Request(url, headers={**UA, 'Range': f'bytes={start}-{end}'})
+        with urllib.request.urlopen(req, timeout=120) as r:
+            if r.status != 206:
+                raise IOError(f'server answered {r.status}, not a partial response: ranges unsupported')
+            return r.read()
+    return patient(go, f'bytes {start}-{end}')
 
 
 def total_size(url):
-    req = urllib.request.Request(url, headers={**UA, 'Range': 'bytes=0-0'})
-    with urllib.request.urlopen(req, timeout=60) as r:
-        cr = r.headers.get('Content-Range', '')
-        return r.status, int(cr.split('/')[-1]) if '/' in cr else int(r.headers.get('Content-Length', 0)), dict(r.headers)
+    def go():
+        req = urllib.request.Request(url, headers={**UA, 'Range': 'bytes=0-0'})
+        with urllib.request.urlopen(req, timeout=60) as r:
+            cr = r.headers.get('Content-Range', '')
+            return r.status, int(cr.split('/')[-1]) if '/' in cr else int(r.headers.get('Content-Length', 0)), dict(r.headers)
+    return patient(go, 'size')
 
 
 def central_directory(url):
