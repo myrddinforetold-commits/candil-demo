@@ -46,7 +46,10 @@ jobs:
         run: modal run brain/candil_brain.py::smoke --question "$Q" --tier "$TIER"
       - name: Build the meaning-based search index
         if: github.event_name == 'workflow_dispatch' && inputs.task == 'build-index'
-        run: modal run brain/candil_brain.py::build_index
+        timeout-minutes: 340
+        env:
+          LIBDIR: ${{ inputs.question }}
+        run: modal run --detach brain/candil_brain.py::build_index --lib "${LIBDIR:-/data/LastbookData}"
       - name: Retire containers so they load the new index
         if: github.event_name == 'workflow_dispatch' && inputs.task == 'build-index'
         run: python3 .github/retire.py

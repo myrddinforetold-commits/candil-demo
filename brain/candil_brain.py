@@ -136,7 +136,7 @@ def setup_medium_library():
         L.extract(f['url'], sel, DATA + '/medium', size, after_span=vol.commit)
         vol.commit()
     t = time.time()
-    code = build_index.local(MED_LIB)
+    code = build_index.remote(MED_LIB)          # in its own 32-core container
     print('index built in', round(time.time() - t), 's, exit', code, flush=True)
 
 
@@ -163,7 +163,7 @@ def setup_full_library(phase: str = 'docs'):
         vol.commit()
     if phase == 'docs':
         t = time.time()
-        code = build_index.local(FULL_LIB)
+        code = build_index.remote(FULL_LIB)     # in its own 32-core container
         print('index built in', round(time.time() - t), 's, exit', code, flush=True)
     else:
         print('encyclopedias saved', flush=True)
