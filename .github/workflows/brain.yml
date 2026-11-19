@@ -63,6 +63,7 @@ jobs:
         run: |
           case "$PACK" in
             status) python3 brain/lastbook_pack.py status ;;
+            rangespeed-*) python3 brain/lastbook_pack.py speed "${PACK#rangespeed-}" 30000000000 ;;
             speed-*) python3 brain/lastbook_pack.py speed "${PACK#speed-}" ;;
             *) python3 brain/lastbook_pack.py probe "${PACK:-all}" ;;
           esac

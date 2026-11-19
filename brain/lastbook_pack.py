@@ -242,10 +242,10 @@ def status():
             print(label, type(ex).__name__, ex)
 
 
-def speed(pack_id, seconds=45):
-    """Plain download (no range) of a pack for a short while, to measure how fast the server sends it."""
+def speed(pack_id, seconds=45, start=None):
+    """Download a pack for a short while (from the start, or from byte `start` with a range request) to measure speed."""
     files, _ = pack_files(pack_id)
-    req = urllib.request.Request(files[0]['url'], headers=UA)
+    req = urllib.request.Request(files[0]['url'], headers={**UA, **({'Range': f'bytes={start}-'} if start else {})})
     t0, n = time.time(), 0
     with urllib.request.urlopen(req, timeout=60) as r:
         print(pack_id, r.status, {k: v for k, v in r.headers.items() if k.lower() in ('content-length', 'cf-cache-status', 'server')}, flush=True)
@@ -261,7 +261,7 @@ if __name__ == '__main__':
     if sys.argv[1] == 'status':
         status()
     if sys.argv[1] == 'speed':
-        speed(sys.argv[2])
+        speed(sys.argv[2], start=int(sys.argv[3]) if len(sys.argv) > 3 else None)
     if sys.argv[1] == 'probe':
         files, meta = pack_files(sys.argv[2])
         print('pack', json.dumps({k: v for k, v in meta.items() if k != 'files'})[:600])
