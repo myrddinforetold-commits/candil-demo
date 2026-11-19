@@ -77,6 +77,11 @@ jobs:
           python3 - <<'PY'
           import json, os, subprocess
           app = os.environ['APP']
+          if app in ('', 'latest'):   # the running download or index job (an ephemeral app), never the live brain
+              apps = json.loads(subprocess.run(['modal', 'app', 'list', '--json'], capture_output=True, text=True).stdout or '[]')
+              jobs = [a for a in apps if a.get('description') == 'candil-brain' and str(a.get('state', '')).startswith('ephemeral')]
+              app = jobs[0]['app_id'] if jobs else ''
+              print('running job:', app or 'none', flush=True)
           found = False
           for c in json.load(open('c.json')):
               if c.get('app_id') == app:
