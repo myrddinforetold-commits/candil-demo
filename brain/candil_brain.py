@@ -200,6 +200,88 @@ def start_relay(api_key):
 
 
 # ------------------------------------------------------------------ answer -> page
+ZIM_LABEL = {'wikipedia': 'Wikipedia', 'wikibooks': 'Wikibooks', 'mdwiki': 'WikiMed (medical Wikipedia)',
+             'appropedia': 'Appropedia'}
+
+
+def add_encyclopedia_search(A):
+    """Give lastbook's assistant a search_encyclopedia tool. Lastbook ships its encyclopedias (Kiwix ZIM files with a
+    full-text index) for browsing, but its assistant only searches documents and transcripts; this lets Candil's answers
+    draw on them too. Each article found is a citable source, like a library passage."""
+    import glob, os, re, threading
+    from libzim.reader import Archive
+    from libzim.search import Searcher, Query
+    from bs4 import BeautifulSoup
+    paths = sorted(glob.glob(os.environ['LASTBOOK_DATA'] + '/library-data/collections/*.zim'))
+    order = lambda p: next((i for i, k in enumerate(('mdwiki', 'wikipedia', 'wikibooks', 'appropedia')) if os.path.basename(p).startswith(k)), 9)
+    paths.sort(key=order)
+    arcs, lock = {}, threading.Lock()
+    print('encyclopedias:', [os.path.basename(p) for p in paths], flush=True)
+
+    def arc(p):
+        with lock:
+            if p not in arcs:
+                arcs[p] = Archive(p)
+            return arcs[p]
+
+    def label(p):
+        n = os.path.basename(p).lower()
+        return next((v for k, v in ZIM_LABEL.items() if n.startswith(k)), os.path.basename(p))
+
+    def passage(a, entry_path, q):
+        e = a.get_entry_by_path(entry_path)
+        if e.is_redirect:
+            e = e.get_redirect_entry()
+        soup = BeautifulSoup(bytes(e.get_item().content).decode('utf-8', 'replace'), 'html.parser')
+        for t in soup(['script', 'style', 'table', 'sup', 'figure', 'nav']):
+            t.decompose()
+        paras = [x.get_text(' ', strip=True) for x in soup.find_all(['p', 'li'])]
+        paras = [x for x in paras if len(x) > 60][:80]
+        if not paras:
+            return e.title, ''
+        words = set(re.findall(r'[a-z]{4,}', q.lower()))
+        best = sorted(paras[1:], key=lambda x: -len(words & set(re.findall(r'[a-z]{4,}', x.lower()))))[:3]
+        return e.title, ' '.join([paras[0]] + best)[:2000]
+
+    def search(q, k=4):
+        per = []
+        for p in paths:
+            try:
+                a = arc(p)
+                if not a.has_fulltext_index:
+                    continue
+                hits = []
+                for ep in Searcher(a).search(Query().set_query(q)).getResults(0, 2):
+                    title, text = passage(a, ep, q)
+                    if text:
+                        hits.append({'doc_id': f'zim:{os.path.basename(p)}:{ep}', 'title': title, 'publisher': label(p),
+                                     'kind': 'encyclopedia', 'trust': 'encyclopedia', 'excerpt': text})
+                per.append(hits)
+            except Exception as ex:   # one damaged file must not cost the answers from the others
+                print('encyclopedia search skipped', os.path.basename(p), type(ex).__name__, flush=True)
+        out = []
+        for rank in range(2):                                  # the best article from each encyclopedia in turn
+            out += [h[rank] for h in per if rank < len(h)]
+        return out[:k]
+
+    A.TOOLS.append({'type': 'function', 'function': {'name': 'search_encyclopedia', 'description':
+        'Search the offline encyclopedias (Wikipedia, Wikibooks, WikiMed medical Wikipedia, Appropedia) for background '
+        'knowledge the manuals do not cover. Returns article passages with citation keys like S3. Use a few plain keywords.',
+        'parameters': {'type': 'object', 'properties': {'query': {'type': 'string', 'description': 'A few plain keywords'}},
+                       'required': ['query']}}})
+    plain = A.run_tool
+
+    def run_tool(name, args, sess, extra_msgs):
+        if name != 'search_encyclopedia':
+            return plain(name, args, sess, extra_msgs)
+        q = str(args.get('query', ''))[:200]
+        items = search(q)
+        if not items:
+            return 'Nothing in the encyclopedias matched. Try other words.', {'query': q, 'count': 0}
+        return '\n\n'.join(A._src_block(sess.add(it), it, it['excerpt']) for it in items), {'query': q, 'count': len(items)}
+    A.run_tool = run_tool
+
+
 def question_parts(question):
     """The separate questions in one spoken request, when there is more than one."""
     import re
@@ -292,6 +374,7 @@ class Brain:
         start_relay(os.environ['OPENROUTER_API_KEY'])
         import server, assistant
         server.init(no_index=True)
+        add_encyclopedia_search(assistant)
         assistant.SYSTEM += ('\n\nThis answer is shown on Candil, a small offline device with an e-paper page and a voice. '
                              'Begin with one short sentence that answers the question. Then give at most 6 numbered steps of '
                              'one sentence each, most urgent first, each ending with its source key. Then the warnings.'
@@ -312,6 +395,10 @@ class Brain:
                              'battery or hand-crank radio, emergency alerts, texting instead of calling, saving phone battery, a '
                              'family communication plan) and answer from what that finds, alongside any quick check of the home '
                              'equipment the library gives.'
+                             '\n\nFor background knowledge the manuals do not cover (what a plant, animal, illness, medicine or '
+                             'material is, how something works, history and geography), call search_encyclopedia, which '
+                             'searches the offline encyclopedias (Wikipedia, Wikibooks, WikiMed, Appropedia). Prefer the manuals '
+                             'and health guides for safety steps; cite encyclopedia passages with their source keys too.'
                              '\n\nKeep every step true to its source, including any condition the source attaches to it '
                              '(for example, advice for when the internet works but the mobile network does not). Leave out a '
                              'step whose condition does not fit the person\'s situation.')

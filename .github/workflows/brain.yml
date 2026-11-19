@@ -37,16 +37,7 @@ jobs:
         run: modal deploy brain/candil_brain.py
       - name: Retire containers still running the previous version
         if: github.event_name == 'push' || inputs.task == 'deploy'
-        run: |
-          modal container list --json > containers.json || echo '[]' > containers.json
-          python3 - <<'PY'
-          import json, subprocess
-          for c in json.load(open('containers.json')):
-              if c.get('App Name') == 'candil-brain' or 'candil-brain' in json.dumps(c):
-                  cid = c.get('Container ID') or c.get('container_id')
-                  print('stopping', cid)
-                  subprocess.run(['modal', 'container', 'stop', '--yes', cid])
-          PY
+        run: python3 .github/retire.py
       - name: Ask one question
         if: github.event_name == 'workflow_dispatch' && inputs.task == 'ask'
         env:
@@ -58,16 +49,7 @@ jobs:
         run: modal run brain/candil_brain.py::build_index
       - name: Retire containers so they load the new index
         if: github.event_name == 'workflow_dispatch' && inputs.task == 'build-index'
-        run: |
-          modal container list --json > containers.json || echo '[]' > containers.json
-          python3 - <<'PY'
-          import json, subprocess
-          for c in json.load(open('containers.json')):
-              if 'candil-brain' in json.dumps(c):
-                  cid = c.get('Container ID') or c.get('container_id')
-                  print('stopping', cid)
-                  subprocess.run(['modal', 'container', 'stop', '--yes', cid])
-          PY
+        run: python3 .github/retire.py
       - name: Try several questions
         if: github.event_name == 'workflow_dispatch' && inputs.task == 'trial'
         env:
