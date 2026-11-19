@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: 'deploy, setup-library, build-index, ask, trial (questions separated by |) or probe-pack (question = pack id)'
+        description: 'deploy, setup-library, build-index, ask, trial (questions separated by |) probe-pack (question = pack id) or setup-full'
         default: deploy
       question:
         description: 'question for ask'
@@ -79,3 +79,7 @@ jobs:
         env:
           PACK: ${{ inputs.question }}
         run: python3 brain/lastbook_pack.py probe "${PACK:-all}"
+      - name: Fetch the full library without videos or maps, then index it
+        if: github.event_name == 'workflow_dispatch' && inputs.task == 'setup-full'
+        timeout-minutes: 340
+        run: modal run --detach brain/candil_brain.py::setup_full_library

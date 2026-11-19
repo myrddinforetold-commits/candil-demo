@@ -45,6 +45,7 @@ image = (
     .env({'HF_HOME': '/models/hf', 'LASTBOOK_DATA': LIB, 'SURVIVAL_PDF_ENGINE': 'pdfium', 'SURVIVAL_DISABLE_INDEX_WATCH': '1',
           'SURVIVAL_MODEL_BASE': 'http://127.0.0.1:19443', 'SURVIVAL_MODEL': 'quick', 'SURVIVAL_REASONING_EFFORT': 'none'})
     .run_function(_bake_models)
+    .add_local_python_source('lastbook_pack')
 )
 
 
@@ -95,23 +96,54 @@ def setup_library(pack: str = 'small'):
     print('library ready at', LIB, flush=True)
 
 
-@app.function(image=image, volumes={DATA: vol}, timeout=3 * 3600, cpu=16, memory=16384)
-def build_index():
+@app.function(image=image, volumes={DATA: vol}, timeout=6 * 3600, cpu=32, memory=32768)
+def build_index(lib: str = LIB):
     """Lastbook's meaning-based search. Packs ship without the embedding model, so fetch BAAI bge-small-en-v1.5 (ONNX,
     MIT licence, the official BAAI repository) into the library, then embed every document once with lastbook's own
     retrieval.py. Afterwards the brain searches by meaning as well as by keyword."""
     import os, shutil, subprocess, sys
     from huggingface_hub import hf_hub_download
-    dst = LIB + '/derived/models/bge-small-en-v1.5'
+    dst = lib + '/derived/models/bge-small-en-v1.5'
     os.makedirs(dst, exist_ok=True)
     for src, name in (('onnx/model.onnx', 'model.onnx'), ('tokenizer.json', 'tokenizer.json')):
         if not os.path.exists(f'{dst}/{name}'):
             shutil.copy(hf_hub_download('BAAI/bge-small-en-v1.5', src), f'{dst}/{name}')
     vol.commit()
-    r = subprocess.run([sys.executable, 'retrieval.py'], cwd='/app/lastbook', env={**os.environ, 'LASTBOOK_DATA': LIB})
+    r = subprocess.run([sys.executable, 'retrieval.py'], cwd='/app/lastbook', env={**os.environ, 'LASTBOOK_DATA': lib})
     vol.commit()
     print('index build exit', r.returncode, flush=True)
     return r.returncode
+
+
+FULL_LIB = DATA + '/full/LastbookData'     # the full library without its videos or its US maps
+
+
+@app.function(image=image, volumes={DATA: vol}, timeout=12 * 3600, cpu=4, memory=8192)
+def setup_full_library():
+    """Lastbook's full library (pack "all") without its videos (232 GB) or its US maps (80 GB): documents, courses,
+    transcripts, encyclopedias and search databases, about 76 GB. Read straight out of the pack with range requests
+    (lastbook_pack.py), every file checked against its CRC-32, into a separate folder; then the meaning-based index is
+    built over it. The brain keeps using the small library until LIB is switched to FULL_LIB."""
+    import time
+    import lastbook_pack as L
+    keep = lambda e: not L.is_video(e['name']) and not e['name'].startswith('LastbookData/derived/geo/')
+    files, meta = L.pack_files('all')
+    for f in files:
+        size, entries = L.central_directory(f['url'])
+        sel = [e for e in entries if keep(e)]
+        print(f"{f['name']}: taking {len(sel)} of {len(entries)} files, {sum(e['usize'] for e in sel) / 1e9:.1f} GB", flush=True)
+        small = [e for e in sel if e['usize'] <= (1 << 30)]
+        big = [e for e in sel if e['usize'] > (1 << 30)]
+        for i in range(0, len(small), 3000):                 # save to the volume as it goes, in case the job restarts
+            L.extract(f['url'], small[i:i + 3000], DATA + '/full', threads=16)
+            vol.commit()
+            print(f'saved {min(i + 3000, len(small))} of {len(small)} files', flush=True)
+        for e in big:
+            L.extract(f['url'], [e], DATA + '/full', threads=1)
+            vol.commit()
+    t = time.time()
+    code = build_index.local(FULL_LIB)
+    print('index built in', round(time.time() - t), 's, exit', code, flush=True)
 
 
 @app.function(image=image, volumes={DATA: vol}, timeout=3 * 3600, cpu=2, memory=4096)
