@@ -19,16 +19,10 @@ def manifest():
         return json.load(r)
 
 
-def pack_url(pack_id):
-    m = manifest()
-    packs = m.get('packs') or m.get('items') or m
-    for p in (packs if isinstance(packs, list) else packs.values()):
-        if isinstance(p, dict) and p.get('id') == pack_id:
-            f = p.get('file') or p.get('download', {}).get('file') or p.get('zip')
-            if isinstance(f, dict):
-                f = f.get('name') or f.get('file')
-            return BASE + f, p
-    raise SystemExit(f'pack {pack_id} not in the manifest: {json.dumps(m)[:600]}')
+def pack_files(pack_id):
+    """The pack's files as the manifest lists them: [{name, size, url, sha256}]."""
+    p = next(x for x in manifest()['packs'] if x['id'] == pack_id)
+    return p['files'], p
 
 
 def get_range(url, start, end, tries=6):
@@ -117,6 +111,9 @@ def extract(url, entries, dest, threads=16, log=print):
     t0 = time.time()
 
     def one(e):
+        parts = e['name'].split('/')
+        if e['name'].startswith('/') or '..' in parts:     # the same guard as lastbook's installer
+            raise IOError(f'unsafe path in pack: {e["name"]}')
         path = os.path.join(dest, e['name'])
         if e['name'].endswith('/'):
             os.makedirs(path, exist_ok=True); return
@@ -156,13 +153,16 @@ def extract(url, entries, dest, threads=16, log=print):
 
 if __name__ == '__main__':
     if sys.argv[1] == 'probe':
-        url, meta = pack_url(sys.argv[2])
-        print('pack', json.dumps({k: v for k, v in meta.items() if k not in ('files',)})[:800])
-        size, entries = central_directory(url)
-        print(f'zip {size / 1e9:.2f} GB, {len(entries)} entries')
-        g = summary(entries)
+        files, meta = pack_files(sys.argv[2])
+        print('pack', json.dumps({k: v for k, v in meta.items() if k != 'files'})[:600])
+        allv = []
+        for f in files:
+            size, entries = central_directory(f['url'])
+            print(f"file {f['name']}: {size / 1e9:.2f} GB, {len(entries)} entries")
+            allv += entries
+        g = summary(allv)
         for top, v in sorted(g.items(), key=lambda kv: -kv[1]['gb'])[:45]:
             ext = ', '.join(f'{k} {gb:.2f}' for k, gb in sorted(v['ext'].items(), key=lambda kv: -kv[1])[:4])
             print(f'{v["gb"]:9.2f} GB {v["files"]:7d} files  {top}   [{ext}]')
-        nv = [e for e in entries if not is_video(e['name'])]
+        nv = [e for e in allv if not is_video(e['name'])]
         print(f'without videos: {sum(e["usize"] for e in nv) / 1e9:.2f} GB in {len(nv)} files')
