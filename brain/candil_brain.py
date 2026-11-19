@@ -504,7 +504,11 @@ def to_page(md, sources):
                 break
             if l and not l.startswith(('*', '-')) and warning == '' and l.lower().startswith(('not found', 'my own')):
                 break
-    src = nice_source(sources[0]) if sources else {}
+    # The source shown is the one the steps cite most (the first cited on a tie), not merely the first one found.
+    cites = [c for g in re.findall(r'\[([^\]]+)\]', ' '.join(raw[:6])) for c in re.findall(r'S\d+', g)]
+    by_key = {x.get('key'): x for x in (sources or []) if x.get('key')}
+    pick = by_key.get(max(dict.fromkeys(cites), key=cites.count)) if cites else None
+    src = nice_source(pick or sources[0]) if sources else {}
     name = src.get('title') or src.get('publisher') or 'the Candil library'
     if src.get('publisher') and src.get('title') and src['publisher'] not in src['title']:
         name = f"{src['publisher']}: {src['title']}"
