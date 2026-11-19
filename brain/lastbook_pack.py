@@ -245,3 +245,8 @@ if __name__ == '__main__':
         print(f'without videos or maps: {sum(e["usize"] for e in nv) / 1e9:.2f} GB in {len(nv)} files')
         sp = spans(nv, size)
         print(f'{len(sp)} stretches, {sum(b - a for a, b, _ in sp) / 1e9:.2f} GB to read; largest gap read through 16 MB')
+        for k, (a, b, ents) in enumerate(sp[:12], 1):
+            print(f'  stretch {k}: bytes {a / 1e9:.2f}-{b / 1e9:.2f} GB ({(b - a) / 1e9:.2f} GB, {len(ents)} files, e.g. {ents[0]["name"][:70]})')
+        big = sorted(sp, key=lambda x: x[0] - x[1])[:6]
+        for a, b, ents in big:
+            print(f'  large: bytes {a / 1e9:.2f}-{b / 1e9:.2f} GB ({(b - a) / 1e9:.2f} GB, {len(ents)} files, e.g. {ents[0]["name"][:70]})')
