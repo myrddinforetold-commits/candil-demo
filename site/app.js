@@ -14,6 +14,7 @@ fetch(BRAIN + '/health').catch(() => {});   // wakes the brain while the page lo
 const SCENARIOS = {
   wifi: {
     world: 'net',
+    tier: 'deep',            // the deeper model keeps the sources' conditions straight on this one (about 5 s)
     audio: './audio/q-wifi.mp3',
     question: 'The Wi-Fi is out. What should I do?',
     sample: {
@@ -30,6 +31,7 @@ const SCENARIOS = {
   },
   cold: {
     world: 'power',
+    tier: 'quick',           // the quick model answers this well in about 5 s; the deeper one takes about 20 s
     audio: './audio/q-cold.mp3',
     question: 'The lights are out and we have no power. It’s cold here. What can we do to stay warm, what should we do right now, and what are the most important things?',
     sample: {
@@ -193,7 +195,7 @@ async function getAnswer(sc, blob) {
   const t0 = performance.now();
   const body = new FormData();
   body.append('audio', blob || await (await fetch(sc.audio)).blob(), blob ? 'question.webm' : 'question.mp3');
-  body.append('tier', 'quick'); body.append('voice', '0');
+  body.append('tier', sc?.tier || 'quick'); body.append('voice', '0');
   const slow = setTimeout(() => toast('Waking the cloud brain. The first answer takes longer.'), 9000);
   try {
     const r = await fetch(BRAIN + '/ask', { method: 'POST', body });
