@@ -254,7 +254,7 @@ def add_encyclopedia_search(A):
                 for ep in Searcher(a).search(Query().set_query(q)).getResults(0, 2):
                     title, text = passage(a, ep, q)
                     if text:
-                        hits.append({'doc_id': f'zim:{os.path.basename(p)}:{ep}', 'title': title, 'publisher': label(p),
+                        hits.append({'zim': f'{os.path.basename(p)}:{ep}', 'title': title, 'publisher': label(p),
                                      'kind': 'encyclopedia', 'trust': 'encyclopedia', 'excerpt': text})
                 per.append(hits)
             except Exception as ex:   # one damaged file must not cost the answers from the others
@@ -270,6 +270,21 @@ def add_encyclopedia_search(A):
         'parameters': {'type': 'object', 'properties': {'query': {'type': 'string', 'description': 'A few plain keywords'}},
                        'required': ['query']}}})
     plain = A.run_tool
+    plain_add = A.Session.add
+
+    def add(self, d):
+        # Encyclopedia articles are not in lastbook's catalogue, so they carry no doc_id (lastbook would drop a
+        # citation whose doc_id it cannot find) and are told apart by their article instead.
+        if d.get('kind') != 'encyclopedia':
+            return plain_add(self, d)
+        for k, v in self.sources.items():
+            if v.get('zim') == d.get('zim'):
+                return k
+        self.n += 1
+        k = f'S{self.n}'
+        self.sources[k] = dict(d, key=k)
+        return k
+    A.Session.add = add
 
     def run_tool(name, args, sess, extra_msgs):
         if name != 'search_encyclopedia':
