@@ -147,6 +147,72 @@ def setup_full_library(phase: str = 'docs'):
         print('encyclopedias saved', flush=True)
 
 
+# Lastbook's full library carries these four Kiwix encyclopedias. Its own download server is slow for a file this size
+# (about 0.7 MB/s, one connection at a time), so they come from Kiwix's servers instead, the same releases, each checked
+# against the SHA-256 Kiwix publishes beside it. The two small ones are already in the small library and are copied.
+ZIMS = ['mdwiki_en_all_maxi_2025-11.zim', 'appropedia_en_all_maxi_2026-02.zim',
+        'wikibooks_en_all_maxi_2026-04.zim', 'wikipedia_en_all_nopic_2026-06.zim']
+
+
+@app.function(image=image, volumes={DATA: vol}, timeout=20 * 3600, cpu=2, memory=4096)
+def fetch_encyclopedias():
+    import hashlib, os, shutil, time, urllib.request
+    UA = {'User-Agent': 'CandilDemo/0.1 (offline library setup; the encyclopedias lastbook ships)'}
+    dest = FULL_LIB + '/library-data/collections'
+    os.makedirs(dest, exist_ok=True)
+    for name in ZIMS:
+        out = f'{dest}/{name}'
+        if os.path.exists(out):
+            print('already there:', name, flush=True); continue
+        mine = f'{LIB}/library-data/collections/{name}'
+        if os.path.exists(mine):
+            shutil.copyfile(mine, out); vol.commit(); print('copied from the small library:', name, flush=True); continue
+        proj = name.split('_')[0]
+        cands = [f'https://download.kiwix.org/{d}/{p}/{name}' for d in ('zim', 'archive/zim') for p in (proj, 'other')]
+        url = sha = None
+        for c in cands:
+            try:
+                with urllib.request.urlopen(urllib.request.Request(c + '.sha256', headers=UA), timeout=60) as r:
+                    sha = r.read().decode().split()[0].lower(); url = c; break
+            except Exception as ex:
+                print('not at', c, type(ex).__name__, flush=True)
+        if not url:
+            raise RuntimeError(f'{name}: not found on download.kiwix.org')
+        part, t0 = out + '.part', time.time()
+        for attempt in range(30):
+            have = os.path.getsize(part) if os.path.exists(part) else 0
+            try:
+                req = urllib.request.Request(url, headers={**UA, **({'Range': f'bytes={have}-'} if have else {})})
+                with urllib.request.urlopen(req, timeout=120) as r, open(part, 'ab' if have and r.status == 206 else 'wb') as f:
+                    total = int(r.headers.get('Content-Length', 0)) + (have if r.status == 206 else 0)
+                    print(f'{name}: {total / 1e9:.1f} GB from {r.url} (from byte {have if r.status == 206 else 0})', flush=True)
+                    last = time.time()
+                    while True:
+                        b = r.read(8 << 20)
+                        if not b:
+                            break
+                        f.write(b)
+                        if time.time() - last > 120:
+                            done = f.tell(); last = time.time()
+                            print(f'{name}: {done / 1e9:.1f} of {total / 1e9:.1f} GB, {done / 1e6 / (time.time() - t0):.1f} MB/s', flush=True)
+                            vol.commit()
+                if os.path.getsize(part) >= total:
+                    break
+            except Exception as ex:
+                print(f'{name}: interrupted ({type(ex).__name__}: {ex}); resuming', flush=True)
+                vol.commit(); time.sleep(min(300, 10 * (attempt + 1)))
+        h = hashlib.sha256()
+        with open(part, 'rb') as fh:
+            for b in iter(lambda: fh.read(16 << 20), b''):
+                h.update(b)
+        if h.hexdigest() != sha:
+            os.remove(part); vol.commit()
+            raise RuntimeError(f'{name}: checksum mismatch')
+        os.replace(part, out); vol.commit()
+        print(f'{name}: checked and saved', flush=True)
+    print('encyclopedias ready', flush=True)
+
+
 @app.function(image=image, volumes={DATA: vol}, timeout=3 * 3600, cpu=2, memory=4096)
 def ensure_library(pack: str = 'small'):
     """Quick when the library is already in the volume; otherwise downloads it (first deploy only)."""

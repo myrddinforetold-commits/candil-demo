@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: 'deploy, setup-library, build-index, ask, trial (questions separated by |) probe-pack (question = pack id), setup-full (question = docs or zims), job-logs or stop-job (question = app id)'
+        description: 'deploy, setup-library, build-index, ask, trial (questions separated by |) probe-pack (question = pack id), setup-full (question = docs or zims), job-logs or stop-job (question = app id), encyclopedias'
         default: deploy
       question:
         description: 'question for ask'
@@ -80,13 +80,15 @@ jobs:
           if app in ('', 'latest'):   # the running download or index job (an ephemeral app), never the live brain
               apps = json.loads(subprocess.run(['modal', 'app', 'list', '--json'], capture_output=True, text=True).stdout or '[]')
               jobs = [a for a in apps if a.get('description') == 'candil-brain' and str(a.get('state', '')).startswith('ephemeral')]
-              app = jobs[0]['app_id'] if jobs else ''
-              print('running job:', app or 'none', flush=True)
+              wanted = {j['app_id'] for j in jobs}
+              print('running jobs:', wanted or 'none', flush=True)
+          else:
+              wanted = {app}
           found = False
           for c in json.load(open('c.json')):
-              if c.get('app_id') == app:
+              if c.get('app_id') in wanted:
                   found = True
-                  print('container', c.get('container_id'), 'started', c.get('start_time'), flush=True)
+                  print('=== container', c.get('container_id'), 'of', c.get('app_id'), 'started', c.get('start_time'), flush=True)
                   subprocess.run(['modal', 'container', 'logs', c['container_id'], '-n', '60', '--timestamps'])
           if not found:
               print('no running container for', app)
@@ -106,3 +108,7 @@ jobs:
           print('stopping', app[0])
           PY
           modal app stop --yes "$APP"
+      - name: Fetch the encyclopedias from Kiwix
+        if: github.event_name == 'workflow_dispatch' && inputs.task == 'encyclopedias'
+        timeout-minutes: 340
+        run: modal run --detach brain/candil_brain.py::fetch_encyclopedias
