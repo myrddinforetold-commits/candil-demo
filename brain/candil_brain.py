@@ -311,6 +311,7 @@ def add_encyclopedia_search(A):
     import glob, os, re, threading
     from libzim.reader import Archive
     from libzim.search import Searcher, Query
+    from libzim.suggestion import SuggestionSearcher
     from bs4 import BeautifulSoup
     found = {}
     for d in (os.environ['LASTBOOK_DATA'], FULL_LIB):        # the library's own, then those fetched from Kiwix
@@ -347,24 +348,49 @@ def add_encyclopedia_search(A):
         best = sorted(paras[1:], key=lambda x: -len(words & set(re.findall(r'[a-z]{4,}', x.lower()))))[:3]
         return e.title, ' '.join([paras[0]] + best)[:2000]
 
+    STOP = set('a an and are can could do does for from how i in is it my of on or should the to what when where which '
+               'who why will with would me you your about'.split())
+    tokens = lambda s: [w for w in re.findall(r"[a-z0-9'’-]+", s.lower()) if w not in STOP]
+
+    def titled(a, q):
+        # The article named after what was asked about ("Hoover Dam" in "Hoover Dam history construction"): the
+        # full-text ranking alone can put a neighbouring article first. Longest run of the query's words first; an
+        # article counts only if every word of its title is in the query.
+        words = tokens(q)[:6]
+        qset = set(words)
+        runs = [words[i:i + n] for n in range(len(words), 0, -1) for i in range(len(words) - n + 1)]
+        for run in runs:
+            if len(run) == 1 and len(words) > 2:
+                break                                          # one word of a longer question is too broad a title
+            for ep in SuggestionSearcher(a).suggest(' '.join(run)).getResults(0, 3):
+                tw = tokens(a.get_entry_by_path(ep).title)
+                if tw and set(tw) <= qset:
+                    return [ep]
+        return []
+
     def search(q, k=4):
-        per = []
+        first, per, seen = [], [], set()
         for p in paths:
             try:
                 a = arc(p)
                 if not a.has_fulltext_index:
                     continue
                 hits = []
-                for ep in Searcher(a).search(Query().set_query(q)).getResults(0, 2):
+                tops = titled(a, q)
+                for ep in tops + [x for x in Searcher(a).search(Query().set_query(q)).getResults(0, 2) if x not in tops]:
+                    key = f'{os.path.basename(p)}:{ep}'
                     title, text = passage(a, ep, q)
-                    if text:
-                        hits.append({'zim': f'{os.path.basename(p)}:{ep}', 'title': title, 'publisher': label(p),
+                    if text and key not in seen and 'may refer to' not in text[:300]:
+                        seen.add(key)
+                        hits.append({'zim': key, 'title': title, 'publisher': label(p),
                                      'kind': 'encyclopedia', 'trust': 'encyclopedia', 'excerpt': text})
+                if tops and hits and hits[0]['zim'].endswith(':' + tops[0]):
+                    first.append(hits.pop(0))
                 per.append(hits)
             except Exception as ex:   # one damaged file must not cost the answers from the others
                 print('encyclopedia search skipped', os.path.basename(p), type(ex).__name__, flush=True)
-        out = []
-        for rank in range(2):                                  # the best article from each encyclopedia in turn
+        out = list(first)                                      # articles named after the subject come first
+        for rank in range(2):                                  # then the best article from each encyclopedia in turn
             out += [h[rank] for h in per if rank < len(h)]
         return out[:k]
 
