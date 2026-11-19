@@ -109,7 +109,17 @@ def build_index(lib: str = LIB):
         if not os.path.exists(f'{dst}/{name}'):
             shutil.copy(hf_hub_download('BAAI/bge-small-en-v1.5', src), f'{dst}/{name}')
     vol.commit()
-    r = subprocess.run([sys.executable, 'retrieval.py'], cwd='/app/lastbook', env={**os.environ, 'LASTBOOK_DATA': lib})
+    # lastbook gives its embedder half of os.cpu_count() threads; in a container that is the host's count, not this
+    # container's share, so the threads fight over the cores. Report the container's own share instead.
+    try:
+        q, period = open('/sys/fs/cgroup/cpu.max').read().split()
+        share = int(q) // int(period) if q != 'max' else os.cpu_count()
+    except Exception:
+        share = os.cpu_count()
+    print(f'cpus: host reports {os.cpu_count()}, this container has {share}', flush=True)
+    wrapper = ("import os, sys, runpy; os.cpu_count = lambda: %d; sys.argv = ['retrieval.py']; "
+               "runpy.run_path('retrieval.py', run_name='__main__')") % (2 * share)
+    r = subprocess.run([sys.executable, '-c', wrapper], cwd='/app/lastbook', env={**os.environ, 'LASTBOOK_DATA': lib})
     vol.commit()
     print('index build exit', r.returncode, flush=True)
     return r.returncode
