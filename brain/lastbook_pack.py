@@ -64,7 +64,9 @@ def total_size(url):
 
 def central_directory(url):
     status, size, headers = total_size(url)
-    if status != 206:
+    # The server sometimes answers the first, one-byte request with the whole file (200) although it supports ranges;
+    # only the size is needed here, and the body is never read. Later requests insist on a partial answer (206).
+    if status != 206 and headers.get('Accept-Ranges', '').lower() != 'bytes':
         raise SystemExit(f'ranges not supported (status {status}); headers {headers}')
     tail = get_range(url, max(0, size - 131072), size - 1)
     i = tail.rfind(b'PK\x05\x06')
