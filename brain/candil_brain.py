@@ -507,7 +507,11 @@ def to_page(md, sources):
     # The source shown is the one the steps cite most (the first cited on a tie), not merely the first one found.
     cites = [c for g in re.findall(r'\[([^\]]+)\]', ' '.join(raw[:6])) for c in re.findall(r'S\d+', g)]
     by_key = {x.get('key'): x for x in (sources or []) if x.get('key')}
-    pick = by_key.get(max(dict.fromkeys(cites), key=cites.count)) if cites else None
+    # Some catalogue titles name only a document's first chapter ("Types of seizures" for a health guide whose page 31
+    # is on malaria), so a cited source whose title shares words with the answer is preferred.
+    said = set(re.findall(r'[a-z]{5,}', (head + ' ' + ' '.join(steps[:6])).lower()))
+    fits = lambda k: bool(said & set(re.findall(r'[a-z]{5,}', str((by_key.get(k) or {}).get('title', '')).lower())))
+    pick = by_key.get(max(dict.fromkeys(cites), key=lambda k: cites.count(k) + 2 * fits(k))) if cites else None
     src = nice_source(pick or sources[0]) if sources else {}
     name = src.get('title') or src.get('publisher') or 'the Candil library'
     if src.get('publisher') and src.get('title') and src['publisher'] not in src['title']:
