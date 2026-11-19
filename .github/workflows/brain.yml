@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: 'deploy, setup-library, build-index, ask or trial (questions separated by |)'
+        description: 'deploy, setup-library, build-index, ask, trial (questions separated by |) or probe-pack (question = pack id)'
         default: deploy
       question:
         description: 'question for ask'
@@ -74,3 +74,8 @@ jobs:
           Q: ${{ inputs.question }}
           TIER: ${{ inputs.tier }}
         run: modal run brain/candil_brain.py::trial --questions "$Q" --tier "$TIER"
+      - name: Look inside a library pack (no download)
+        if: github.event_name == 'workflow_dispatch' && inputs.task == 'probe-pack'
+        env:
+          PACK: ${{ inputs.question }}
+        run: python3 brain/lastbook_pack.py probe "${PACK:-all}"
