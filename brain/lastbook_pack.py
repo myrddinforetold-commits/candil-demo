@@ -104,51 +104,112 @@ def summary(entries):
     return groups
 
 
-def extract(url, entries, dest, threads=16, log=print):
-    """Fetch the chosen entries into dest, keeping their paths; skip files already there with the right size."""
-    done = {'n': 0, 'bytes': 0}
-    lock = threading.Lock()
-    t0 = time.time()
+def spans(entries, size, max_gap=16 << 20):
+    """Group wanted entries into stretches of the ZIP that can each be fetched as one stream. A stretch is cut where
+    an unwanted gap (a video, say) is longer than max_gap, so videos are never downloaded in bulk."""
+    out = []
+    for e in sorted(entries, key=lambda e: e['off']):
+        end = min(size, e['off'] + 30 + len(e['name'].encode()) + 4096 + e['csize'])
+        if out and e['off'] - out[-1][1] <= max_gap:
+            out[-1][1] = max(out[-1][1], end); out[-1][2].append(e)
+        else:
+            out.append([e['off'], end, [e]])
+    return out
 
-    def one(e):
-        parts = e['name'].split('/')
-        if e['name'].startswith('/') or '..' in parts:     # the same guard as lastbook's installer
-            raise IOError(f'unsafe path in pack: {e["name"]}')
-        path = os.path.join(dest, e['name'])
-        if e['name'].endswith('/'):
-            os.makedirs(path, exist_ok=True); return
-        if os.path.exists(path) and os.path.getsize(path) == e['usize']:
-            return
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        hdr = get_range(url, e['off'], e['off'] + 29)
-        nlen, xlen = struct.unpack('<HH', hdr[26:30])
-        start = e['off'] + 30 + nlen + xlen
-        tmp = path + '.part'
-        crc, step = 0, 64 << 20
-        dec = zlib.decompressobj(-15) if e['method'] == 8 else None
-        with open(tmp, 'wb') as f:
-            for a in range(start, start + e['csize'], step):
-                chunk = get_range(url, a, min(a + step, start + e['csize']) - 1)
-                data = dec.decompress(chunk) if dec else chunk
-                crc = zlib.crc32(data, crc); f.write(data)
-            if dec:
-                data = dec.flush(); crc = zlib.crc32(data, crc); f.write(data)
-        if (crc & 0xFFFFFFFF) != e['crc']:
-            os.remove(tmp); raise IOError(f'CRC mismatch: {e["name"]}')
-        os.replace(tmp, path)
-        with lock:
-            done['n'] += 1; done['bytes'] += e['usize']
-            if done['n'] % 200 == 0:
-                log(f'{done["n"]} files, {done["bytes"] / 1e9:.1f} GB, {time.time() - t0:.0f} s', flush=True)
 
-    big = [e for e in entries if e['usize'] > (1 << 30)]
-    small = [e for e in entries if e['usize'] <= (1 << 30)]
-    with ThreadPoolExecutor(threads) as ex:
-        list(ex.map(one, small))
-    for e in big:                                     # very large files (encyclopedias) one at a time, in 64 MB ranges
-        log(f'large file {e["name"]} {e["usize"] / 1e9:.1f} GB', flush=True)
-        one(e)
-    log(f'done: {done["n"]} files, {done["bytes"] / 1e9:.1f} GB in {time.time() - t0:.0f} s', flush=True)
+class RangeStream:
+    """Sequential reader over bytes [start, end) of url. If the connection drops or the server is busy, it waits
+    (longer each time, as the server asks) and carries on from where it was."""
+
+    def __init__(self, url, start, end):
+        self.url, self.pos, self.end, self.r = url, start, end, None
+
+    def _open(self):
+        for i in range(12):
+            try:
+                req = urllib.request.Request(self.url, headers={**UA, 'Range': f'bytes={self.pos}-{self.end - 1}'})
+                self.r = urllib.request.urlopen(req, timeout=120)
+                if self.r.status != 206:
+                    raise IOError(f'server answered {self.r.status}, not a partial response')
+                return
+            except Exception as ex:
+                wait = min(300, 10 * 2 ** i)
+                ra = getattr(ex, 'headers', None) and ex.headers.get('Retry-After')
+                if ra and str(ra).isdigit():
+                    wait = max(wait, int(ra))
+                print(f'download busy ({type(ex).__name__}: {ex}); waiting {wait} s', flush=True)
+                time.sleep(wait)
+        raise IOError('the download server stayed unavailable')
+
+    def read(self, n):
+        out = bytearray()
+        while len(out) < n and self.pos < self.end:
+            if self.r is None:
+                self._open()
+            try:
+                b = self.r.read(min(n - len(out), 1 << 20))
+                if not b:
+                    raise IOError('connection closed early')
+                out += b; self.pos += len(b)
+            except Exception as ex:
+                print(f'connection lost at byte {self.pos} ({type(ex).__name__}); resuming', flush=True)
+                self.r = None
+                time.sleep(5)
+        return bytes(out)
+
+    def skip_to(self, pos):
+        if pos - self.pos > (8 << 20):                    # far ahead: a new request is cheaper than reading through
+            self.r, self.pos = None, pos
+        else:
+            while self.pos < pos:
+                self.read(min(pos - self.pos, 1 << 20))
+
+
+def extract(url, entries, dest, size, log=print, after_span=None):
+    """Fetch the chosen entries into dest, keeping their paths, one stream per stretch of the ZIP. Files already
+    there with the right size are kept; every new file is checked against its CRC-32."""
+    t0, got = time.time(), 0
+    sp = spans(entries, size)
+    log(f'{len(entries)} files in {len(sp)} stretches, {sum(b - a for a, b, _ in sp) / 1e9:.1f} GB to read', flush=True)
+    for n, (a, b, ents) in enumerate(sp, 1):
+        todo = []
+        for e in ents:
+            parts = e['name'].split('/')
+            if e['name'].startswith('/') or '..' in parts:     # the same guard as lastbook's installer
+                raise IOError(f'unsafe path in pack: {e["name"]}')
+            path = os.path.join(dest, e['name'])
+            if e['name'].endswith('/'):
+                os.makedirs(path, exist_ok=True)
+            elif not (os.path.exists(path) and os.path.getsize(path) == e['usize']):
+                todo.append((e, path))
+        if not todo:
+            continue
+        rs = RangeStream(url, todo[0][0]['off'], b)
+        for e, path in todo:
+            rs.skip_to(e['off'])
+            hdr = rs.read(30)
+            if hdr[:4] != b'PK\x03\x04':
+                raise IOError(f'no local header for {e["name"]}')
+            nlen, xlen = struct.unpack('<HH', hdr[26:30])
+            rs.read(nlen + xlen)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            tmp, crc, left = path + '.part', 0, e['csize']
+            dec = zlib.decompressobj(-15) if e['method'] == 8 else None
+            with open(tmp, 'wb') as f:
+                while left:
+                    chunk = rs.read(min(left, 4 << 20)); left -= len(chunk)
+                    data = dec.decompress(chunk) if dec else chunk
+                    crc = zlib.crc32(data, crc); f.write(data)
+                if dec:
+                    data = dec.flush(); crc = zlib.crc32(data, crc); f.write(data)
+            if (crc & 0xFFFFFFFF) != e['crc']:
+                os.remove(tmp); raise IOError(f'CRC mismatch: {e["name"]}')
+            os.replace(tmp, path)
+            got += e['usize']
+        log(f'stretch {n}/{len(sp)} done: {got / 1e9:.1f} GB so far, {time.time() - t0:.0f} s', flush=True)
+        if after_span:
+            after_span()
+    log(f'done: {got / 1e9:.1f} GB in {time.time() - t0:.0f} s', flush=True)
 
 
 if __name__ == '__main__':
@@ -164,5 +225,7 @@ if __name__ == '__main__':
         for top, v in sorted(g.items(), key=lambda kv: -kv[1]['gb'])[:45]:
             ext = ', '.join(f'{k} {gb:.2f}' for k, gb in sorted(v['ext'].items(), key=lambda kv: -kv[1])[:4])
             print(f'{v["gb"]:9.2f} GB {v["files"]:7d} files  {top}   [{ext}]')
-        nv = [e for e in allv if not is_video(e['name'])]
-        print(f'without videos: {sum(e["usize"] for e in nv) / 1e9:.2f} GB in {len(nv)} files')
+        nv = [e for e in allv if not is_video(e['name']) and not e['name'].startswith('LastbookData/derived/geo/')]
+        print(f'without videos or maps: {sum(e["usize"] for e in nv) / 1e9:.2f} GB in {len(nv)} files')
+        sp = spans(nv, size)
+        print(f'{len(sp)} stretches, {sum(b - a for a, b, _ in sp) / 1e9:.2f} GB to read; largest gap read through 16 MB')

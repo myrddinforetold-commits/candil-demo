@@ -122,7 +122,7 @@ FULL_LIB = DATA + '/full/LastbookData'     # the full library without its videos
 def setup_full_library():
     """Lastbook's full library (pack "all") without its videos (232 GB) or its US maps (80 GB): documents, courses,
     transcripts, encyclopedias and search databases, about 76 GB. Read straight out of the pack with range requests
-    (lastbook_pack.py), every file checked against its CRC-32, into a separate folder; then the meaning-based index is
+    (lastbook_pack.py: a few long streams, not one request per file), every file checked against its CRC-32, into a separate folder; then the meaning-based index is
     built over it. The brain keeps using the small library until LIB is switched to FULL_LIB."""
     import time
     import lastbook_pack as L
@@ -132,15 +132,8 @@ def setup_full_library():
         size, entries = L.central_directory(f['url'])
         sel = [e for e in entries if keep(e)]
         print(f"{f['name']}: taking {len(sel)} of {len(entries)} files, {sum(e['usize'] for e in sel) / 1e9:.1f} GB", flush=True)
-        small = [e for e in sel if e['usize'] <= (1 << 30)]
-        big = [e for e in sel if e['usize'] > (1 << 30)]
-        for i in range(0, len(small), 3000):                 # save to the volume as it goes, in case the job restarts
-            L.extract(f['url'], small[i:i + 3000], DATA + '/full', threads=16)
-            vol.commit()
-            print(f'saved {min(i + 3000, len(small))} of {len(small)} files', flush=True)
-        for e in big:
-            L.extract(f['url'], [e], DATA + '/full', threads=1)
-            vol.commit()
+        L.extract(f['url'], sel, DATA + '/full', size, after_span=vol.commit)   # one stream per stretch, saved as it goes
+        vol.commit()
     t = time.time()
     code = build_index.local(FULL_LIB)
     print('index built in', round(time.time() - t), 's, exit', code, flush=True)
