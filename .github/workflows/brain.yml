@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: 'deploy, setup-library, build-index, ask, trial (questions separated by |) probe-pack (question = pack id), setup-full or job-logs (question = app id)'
+        description: 'deploy, setup-library, build-index, ask, trial (questions separated by |) probe-pack (question = pack id), setup-full (question = docs or zims), job-logs or stop-job (question = app id)'
         default: deploy
       question:
         description: 'question for ask'
@@ -65,7 +65,9 @@ jobs:
       - name: Fetch the full library without videos or maps, then index it
         if: github.event_name == 'workflow_dispatch' && inputs.task == 'setup-full'
         timeout-minutes: 340
-        run: modal run --detach brain/candil_brain.py::setup_full_library
+        env:
+          PHASE: ${{ inputs.question }}
+        run: modal run --detach brain/candil_brain.py::setup_full_library --phase "${PHASE:-docs}"
       - name: Show a running job's latest log lines
         if: github.event_name == 'workflow_dispatch' && inputs.task == 'job-logs'
         env:
@@ -80,8 +82,22 @@ jobs:
               if c.get('app_id') == app:
                   found = True
                   print('container', c.get('container_id'), 'started', c.get('start_time'), flush=True)
-                  subprocess.run(['modal', 'container', 'logs', c['container_id'], '-n', '60'])
+                  subprocess.run(['modal', 'container', 'logs', c['container_id'], '-n', '60', '--timestamps'])
           if not found:
               print('no running container for', app)
               subprocess.run(['modal', 'app', 'list'])
           PY
+      - name: Stop a running job
+        if: github.event_name == 'workflow_dispatch' && inputs.task == 'stop-job'
+        env:
+          APP: ${{ inputs.question }}
+        run: |
+          modal app list --json > apps.json
+          python3 - <<'PY'
+          import json, os, sys
+          app = [a for a in json.load(open('apps.json')) if a.get('app_id') == os.environ['APP']]
+          if not app or app[0].get('state') == 'deployed':
+              sys.exit(f'refusing: {os.environ["APP"]} is not a running job (it may be the live brain)')
+          print('stopping', app[0])
+          PY
+          modal app stop --yes "$APP"

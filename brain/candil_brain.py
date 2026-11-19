@@ -119,14 +119,19 @@ FULL_LIB = DATA + '/full/LastbookData'     # the full library without its videos
 
 
 @app.function(image=image, volumes={DATA: vol}, timeout=12 * 3600, cpu=4, memory=8192)
-def setup_full_library():
+def setup_full_library(phase: str = 'docs'):
     """Lastbook's full library (pack "all") without its videos (232 GB) or its US maps (80 GB): documents, courses,
     transcripts, encyclopedias and search databases, about 76 GB. Read straight out of the pack with range requests
     (lastbook_pack.py: a few long streams, not one request per file), every file checked against its CRC-32, into a separate folder; then the meaning-based index is
     built over it. The brain keeps using the small library until LIB is switched to FULL_LIB."""
     import time
     import lastbook_pack as L
-    keep = lambda e: not L.is_video(e['name']) and not e['name'].startswith('LastbookData/derived/geo/')
+    # phase "docs": everything but the encyclopedias (about 14 GB: documents, courses, transcripts, search databases),
+    # then the index, so Candil can switch over soon. Phase "zims": the encyclopedias (about 62 GB), which Candil
+    # finds the next time it starts.
+    base = lambda e: not L.is_video(e['name']) and not e['name'].startswith('LastbookData/derived/geo/')
+    zim = lambda e: e['name'].lower().endswith('.zim')
+    keep = (lambda e: base(e) and not zim(e)) if phase == 'docs' else (lambda e: base(e) and zim(e))
     files, meta = L.pack_files('all')
     for f in files:
         size, entries = L.central_directory(f['url'])
@@ -134,9 +139,12 @@ def setup_full_library():
         print(f"{f['name']}: taking {len(sel)} of {len(entries)} files, {sum(e['usize'] for e in sel) / 1e9:.1f} GB", flush=True)
         L.extract(f['url'], sel, DATA + '/full', size, after_span=vol.commit)   # one stream per stretch, saved as it goes
         vol.commit()
-    t = time.time()
-    code = build_index.local(FULL_LIB)
-    print('index built in', round(time.time() - t), 's, exit', code, flush=True)
+    if phase == 'docs':
+        t = time.time()
+        code = build_index.local(FULL_LIB)
+        print('index built in', round(time.time() - t), 's, exit', code, flush=True)
+    else:
+        print('encyclopedias saved', flush=True)
 
 
 @app.function(image=image, volumes={DATA: vol}, timeout=3 * 3600, cpu=2, memory=4096)
