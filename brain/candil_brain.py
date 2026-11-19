@@ -116,6 +116,28 @@ def build_index(lib: str = LIB):
 
 
 FULL_LIB = DATA + '/full/LastbookData'     # the full library without its videos or its US maps
+MED_LIB = DATA + '/medium/LastbookData'    # the medium library without its videos or its California map
+
+
+@app.function(image=image, volumes={DATA: vol}, timeout=6 * 3600, cpu=4, memory=8192)
+def setup_medium_library():
+    """Lastbook's medium library without its videos (39 GB) or its California map: every document in the full library
+    except its firearms manuals, plus courses, transcripts, Wikibooks, WikiMed and Appropedia. Its download server sends
+    this pack quickly (the full pack's file comes about a hundred times slower). Read with range requests, every file
+    checked against its CRC-32, then indexed for meaning-based search."""
+    import time
+    import lastbook_pack as L
+    keep = lambda e: not L.is_video(e['name']) and not e['name'].startswith('LastbookData/derived/geo/')
+    files, meta = L.pack_files('medium')
+    for f in files:
+        size, entries = L.central_directory(f['url'])
+        sel = [e for e in entries if keep(e)]
+        print(f"{f['name']}: taking {len(sel)} of {len(entries)} files, {sum(e['usize'] for e in sel) / 1e9:.1f} GB", flush=True)
+        L.extract(f['url'], sel, DATA + '/medium', size, after_span=vol.commit)
+        vol.commit()
+    t = time.time()
+    code = build_index.local(MED_LIB)
+    print('index built in', round(time.time() - t), 's, exit', code, flush=True)
 
 
 @app.function(image=image, volumes={DATA: vol}, timeout=12 * 3600, cpu=4, memory=8192)
@@ -279,7 +301,11 @@ def add_encyclopedia_search(A):
     from libzim.reader import Archive
     from libzim.search import Searcher, Query
     from bs4 import BeautifulSoup
-    paths = sorted(glob.glob(os.environ['LASTBOOK_DATA'] + '/library-data/collections/*.zim'))
+    found = {}
+    for d in (os.environ['LASTBOOK_DATA'], FULL_LIB):        # the library's own, then those fetched from Kiwix
+        for p in sorted(glob.glob(d + '/library-data/collections/*.zim')):
+            found.setdefault(os.path.basename(p), p)
+    paths = list(found.values())
     order = lambda p: next((i for i, k in enumerate(('mdwiki', 'wikipedia', 'wikibooks', 'appropedia')) if os.path.basename(p).startswith(k)), 9)
     paths.sort(key=order)
     arcs, lock = {}, threading.Lock()

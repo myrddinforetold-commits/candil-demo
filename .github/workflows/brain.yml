@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: 'deploy, setup-library, build-index, ask, trial (questions separated by |) probe-pack (question = pack id), setup-full (question = docs or zims), job-logs or stop-job (question = app id), encyclopedias'
+        description: 'deploy, setup-library, build-index, ask, trial (questions separated by |) probe-pack (question = pack id), setup-full (question = docs or zims), job-logs or stop-job (question = app id), encyclopedias, setup-medium'
         default: deploy
       question:
         description: 'question for ask'
@@ -117,3 +117,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.task == 'encyclopedias'
         timeout-minutes: 340
         run: modal run --detach brain/candil_brain.py::fetch_encyclopedias
+      - name: Fetch the medium library without videos or map, then index it
+        if: github.event_name == 'workflow_dispatch' && inputs.task == 'setup-medium'
+        timeout-minutes: 340
+        run: modal run --detach brain/candil_brain.py::setup_medium_library
