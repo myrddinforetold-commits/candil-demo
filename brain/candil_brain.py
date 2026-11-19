@@ -149,6 +149,15 @@ def start_relay(api_key):
 
 
 # ------------------------------------------------------------------ answer -> page
+def outage_search(question):
+    """For questions about the internet or phone network being down: an extra library search for staying informed."""
+    import re
+    if re.search(r"\b(wi-?fi|internet|online|broadband|router|network|no signal|mobile data|phones? (are|is) (down|out|dead))\b", question, re.I):
+        return ('internet and phone networks down in an emergency: battery or hand-crank radio for news and alerts, '
+                'text instead of calling, save phone battery, family communication plan and meeting place')
+    return None
+
+
 def nice_source(src):
     """Some saved web pages are titled by their address; give them a readable title and publisher."""
     import re
@@ -262,7 +271,30 @@ class Brain:
         events = []
         with self.lock:
             self.assistant.MODEL = tier
-            self.assistant.chat([{'role': 'user', 'content': question}], None, events.append, lambda: False)
+            A = self.assistant
+            plain = A.hybrid
+            extra = outage_search(question)
+            if extra:
+                # Candil is an emergency device: "the Wi-Fi is out" may be a wider outage, so the first library
+                # search also looks for how to stay informed and in touch. Those pages come first; the answer
+                # is still written only from what the library returns.
+                first = {'done': False}
+                def hybrid(q, k=8, *a, **kw):
+                    hits = plain(q, k, *a, **kw)
+                    if first['done'] or q != question[:300]:
+                        return hits
+                    first['done'] = True
+                    seen, out = set(), []
+                    for h in plain(extra, k) + hits:
+                        key = (h.get('doc_id'), h.get('page'))
+                        if key not in seen:
+                            seen.add(key); out.append(h)
+                    return out[:k]
+                A.hybrid = hybrid
+            try:
+                A.chat([{'role': 'user', 'content': question}], None, events.append, lambda: False)
+            finally:
+                A.hybrid = plain
         done = next((e for e in events if e.get('type') == 'done'), None)
         if not done:
             err = next((e for e in events if e.get('type') == 'error'), {})
